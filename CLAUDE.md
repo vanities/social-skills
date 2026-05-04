@@ -152,4 +152,4 @@ Both wrappers `cd` into the repo, restore PATH for macOS cron, and invoke `claud
 
 - Memory: `~/.claude/projects/-Users-vanities-git-work-me/memory/social_agents_design.md`
 - User's global rules referencing `agent-browser`: `/Users/vanities/git/work/teraflop/teraflop-dev-setup/rules/validate-ui.md` and `solutions-fabric-auth.md`.
-- Repo is local-only currently (`gh repo create` not yet run; user wants `--private` when we do).
+- Repo: `git@github.com:vanities/social-agents.git` (PRIVATE, pushed 2026-05-04).
