@@ -22,6 +22,20 @@ test -f "$1" && echo "media ok" || echo "MEDIA MISSING at $1"
 
 If the media is missing, abort.
 
+## Step 1b: Pad tall iPhone screenshots to 4:5
+
+If `$1` is a tall portrait image (aspect ratio narrower than 4:5, e.g. raw iPhone simulator screenshots are ~9:19.5), Instagram will aggressively auto-crop the top and bottom. Run the padding helper first:
+
+```bash
+PADDED=$(bash scripts/pad_ios_screenshot.sh "$1" "" edge)
+# Modes: edge (default, seamless) | blur (Apple-style blurred bg) | random (curated palette) | #RRGGBB (solid)
+# The script no-ops if the image is already 4:5 or wider.
+```
+
+Then use `$PADDED` instead of `$1` for the upload step. The original file is left untouched.
+
+For an aesthetic post (e.g. feature posts where the screenshot is the hero), prefer `blur` — it produces a polished album-art-style frame.
+
 ## Step 2: Find or open the Instagram tab
 
 ```!
@@ -54,9 +68,21 @@ Then re-snapshot.
 
 ## Step 5: Upload the media
 
-When the upload dialog is reachable, click **"Select from computer"**. Then upload `$1`.
+When the upload dialog is reachable, find the underlying `<input type=file>`:
 
-`agent-browser upload <file-input-ref> "$1"` for the file input (this one is *not* a human-typed field, so plain upload is correct). Wait jitter after:
+```bash
+agent-browser eval "Array.from(document.querySelectorAll('input[type=file]')).map(e=>({accept:e.accept,multiple:e.multiple}))"
+```
+
+The IG file input has `multiple=true` — pass multiple paths to `agent-browser upload` for a carousel post:
+
+```bash
+agent-browser upload "input[type=file]" "$PADDED"                 # single image
+# or for a carousel (each path padded individually first):
+agent-browser upload "input[type=file]" "$PADDED1" "$PADDED2"
+```
+
+This is *not* a human-typed field, so plain upload is correct. Wait jitter after:
 
 ```bash
 agent-browser wait $(bash scripts/jitter.sh 800 1800)

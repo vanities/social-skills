@@ -26,6 +26,18 @@ xcrun simctl io booted screenshot "$SHOT"
 ls -lh "$SHOT"
 ```
 
+## Step 2b: Pad to 4:5 for Instagram
+
+Raw iPhone screenshots are ~9:19.5 — IG's auto-crop chops important top/bottom content. Pad to 4:5 first:
+
+```!
+SHOT="/tmp/daily-devotional-$(date +%Y-%m-%d).png"
+PADDED=$(bash scripts/pad_ios_screenshot.sh "$SHOT" "/tmp/daily-devotional-$(date +%Y-%m-%d)-4x5.jpg" edge)
+ls -lh "$PADDED"
+```
+
+Use `$PADDED` (the 4:5 version) for the post in step 4, not `$SHOT`.
+
 ## Step 3: Read the caption (optional)
 
 ```!
@@ -37,7 +49,7 @@ test -f ~/.social-agents/daily-devotional-caption.txt && cat ~/.social-agents/da
 Invoke `/instagram-post` with:
 
 - account = `${SOCIAL_AGENTS_IG_ACCOUNT:-swiftbible}`
-- media = `/tmp/daily-devotional-$(date +%Y-%m-%d).png`
+- media = `/tmp/daily-devotional-$(date +%Y-%m-%d)-4x5.jpg` (the padded version from step 2b)
 - caption = output of step 3 (empty string if the file didn't exist)
 
 ## Verification and reporting

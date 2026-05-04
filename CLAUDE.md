@@ -39,16 +39,17 @@ bash scripts/launch_browser.sh
 
 ## Conventions every skill follows
 
-1. **Tab-aware**: `agent-browser tab list`, switch into existing platform tab if present, else `tab new <url>`. Never close the tab.
+1. **Tab-aware**: `agent-browser tab list`, switch into existing platform tab if present (`agent-browser tab <index>`, NOT `tab switch <index>` — that subcommand doesn't exist), else `tab new <url>`. Never close the tab.
 2. **Jitter**: `agent-browser wait $(bash scripts/jitter.sh MIN MAX)` between actions. Defaults:
    - After nav / tab switch: 600–1600 ms
    - Between fills in a form: 300–1000 ms
    - Before clicking Sign in / Post / Share: 1200–3000 ms
 3. **Real keystrokes for human-typed fields**: `agent-browser type @<ref>` (not `fill`) for username, password, caption.
-4. **`fill` / `upload` for file inputs**: file paths get pasted, not typed.
-5. **Form-field logging mandatory**: every login/post run writes `~/.social-agents/logs/<action>/<platform>-<account>-<ts>.json` with the `@refs` it discovered. If a platform changes its UI, this is the breadcrumb that makes it easy to update the skill.
-6. **`.env` parsing**: don't `source .env` — passwords contain `$`, backticks, etc. that re-evaluate. Use `grep -m1 '^KEY=' .env | cut -d= -f2-` to extract literal values.
-7. **Per-platform credential format**:
+4. **`fill` / `upload` for file inputs**: file paths get pasted, not typed. `agent-browser upload <selector> <files...>` accepts multiple positional paths — use it for carousel posts on IG and LinkedIn (both expose `input[type=file]` with `multiple=true`).
+5. **Pre-pad iPhone screenshots before posting**: raw iOS simulator screenshots are ~9:19.5, well outside Instagram's allowed range. `bash scripts/pad_ios_screenshot.sh <input> [output] [mode]` pads to 4:5 with seamless edge color (default), an Apple-style blurred background (`blur`), a random palette color (`random`), or a hex color. Skill steps that take iPhone screenshots should always pass through this script first.
+6. **Form-field logging mandatory**: every login/post run writes `~/.social-agents/logs/<action>/<platform>-<account>-<ts>.json` with the `@refs` it discovered. If a platform changes its UI, this is the breadcrumb that makes it easy to update the skill.
+7. **`.env` parsing**: don't `source .env` — passwords contain `$`, backticks, etc. that re-evaluate. Use `grep -m1 '^KEY=' .env | cut -d= -f2-` to extract literal values.
+8. **Per-platform credential format**:
    - Instagram: `INSTAGRAM_<ACCOUNT_LABEL>_USERNAME` / `_PASSWORD` (e.g. `INSTAGRAM_SWIFTBIBLE_*`).
    - LinkedIn: unsplit `LINKEDIN_USERNAME` / `LINKEDIN_PASSWORD` (single account).
 
@@ -60,13 +61,20 @@ bash scripts/launch_browser.sh
 | `/instagram-post <account> <media> <caption>` | Click Create → upload → 4:5 crop → type caption → Share. | ✅ Tested live (post is up at instagram.com/swift_bible) |
 | `/post-daily-devotional` | Composite: `xcrun simctl io booted screenshot` → `/instagram-post`. Default account `swiftbible`. | ✅ Posted live 2026-05-04 |
 | `/linkedin-login` | Auto via .env. Pauses for verification PIN if checkpoint appears. | ✅ Live-tested through PIN challenge |
-| `/linkedin-post <personal\|<company-id>> <media> <caption>` | Personal feed OR company-page post (e.g. `104970470` for AM2 LLC). | ⚠️ Skill written but not yet end-to-end tested |
+| `/linkedin-post <personal\|<company-id>> <media> <caption>` | Personal feed OR company-page post (e.g. `104970470` for AM2 LLC). Pass multiple media paths to upload a carousel. | ✅ Live-tested 2026-05-04 (AM2 LLC, 2-image carousel) |
+| `/x-login` | Two-step username → password flow. Auto via `TWITTER_USERNAME` / `TWITTER_PASSWORD` (username can be handle, email, or phone). Pauses for any verification challenge. | ✅ Live-tested 2026-05-04 (`swiftbible@am2.biz`, no challenge surfaced) |
+| `/x-post <thread-json>` | Single tweet OR multi-tweet via reply chain. Reads JSON `[{text, media?}, ...]`. First tweet supports up to 4 images via `multiple=true` input; subsequent tweets are posted as **replies** to the previous (not in-modal threads — see skill for why). | ✅ Live-tested 2026-05-04 (1 single tweet + 1 three-tweet reply chain on `@swift_bible`) |
+| `/feature-post <description> [platforms]` | Orchestrates the full multi-platform feature-launch flow: drive iOS sim → capture screenshots → pad → draft platform-tailored captions → user approval → cross-post to LinkedIn (AM2 LLC) / IG (swiftbible) / X (swift_bible). Composes the per-platform `/<platform>-post` skills. | ⚠️ Skill written, not yet end-to-end tested as a single invocation (every component step has been exercised) |
 
 ## Live state (as of 2026-05-04)
 
-- **`swiftbible`** Instagram (https://www.instagram.com/swift_bible/) — logged in, 1 live post (daily devotional for May 4), bio set to "📖 Daily devotionals from the Swift Bible app. New post every day at noon. am2.biz/swiftbible".
+- **`swiftbible`** Instagram (https://www.instagram.com/swift_bible/) — logged in, 2 live posts:
+  1. Daily devotional (May 4 — James 2:12)
+  2. Feature carousel: redesigned More tab + new History view (cross-posted from the AM2 LLC LinkedIn post). Run log at `~/.social-agents/logs/post/instagram-swiftbible-2026-05-04T112554.json`.
+  Bio set to "📖 Daily devotionals from the Swift Bible app. New post every day at noon. am2.biz/swiftbible".
 - **LinkedIn personal** (`mischkeaa@gmail.com` → `Adam Mischke`) — logged in, state saved.
-- **AM2 LLC company page** (id `104970470`) — admin access confirmed, the *Start a post* compose modal was open at end of last session with audience switcher reading "AM2 LLC … Post to Anyone". **Posting an AM2 LLC update was the in-flight task; the user paused to gather screenshots from the Swift Bible iOS app's More tab + History view.**
+- **AM2 LLC company page** (id `104970470`) — admin access confirmed. First live post landed 2026-05-04: 2-image carousel featuring the Swift Bible iOS app's redesigned More tab + new History view (Church history, 9 eras / 29 articles). Run log at `~/.social-agents/logs/post/linkedin-104970470-2026-05-04T111757.json`.
+- **X (Twitter)** `@swift_bible` (account `swiftbible@am2.biz`) — logged in 2026-05-04, state at `~/.config/agent-browser/x-default.json`. First-day posts: (1) daily devotional tweet (May 4 — James 2:12) + screenshot, (2) 3-tweet reply chain on the More-tab/History feature with screenshots on T1 and T2. Profile shows "5 posts" because each reply counts. **X surfaced a "graduated access" soft-restriction modal after the first post** — reduced reach + DM filtering until the account engages with the timeline / follows people. Doesn't block posting; dismiss via "Got it". Worth following accounts and engaging organically to graduate.
 
 ## Cron
 
@@ -78,19 +86,19 @@ The script `cd`s into the repo and runs `claude --print "/post-daily-devotional"
 
 ## In-flight work (next session resumes here)
 
-1. **AM2 LLC feature post — Swift Bible "More tab redesign + History view"**: user wants two screenshots from the iOS simulator (More tab, then tap History). User asked me to make this a skill *per platform* — see "feature-post pattern" below.
-2. **`/feature-post` design** — not yet implemented. The pattern the user described:
-   - User gives a 1–2 sentence feature description ("redesigned more tab, opened up history view").
-   - Agent screenshots the relevant simulator state(s) — user navigates the simulator manually unless xcodebuildmcp tools are surfaced (see "Known issues").
-   - Agent drafts a platform-tailored caption (LinkedIn: professional/builder; IG: same as the Swift Bible audience).
-   - User approves.
-   - Agent posts. Cross-posts optional.
-   - Suggested skill files (not yet written): `.claude/skills/linkedin-post-feature/SKILL.md`, `.claude/skills/instagram-post-feature/SKILL.md`. Each thin — composes the existing `/<platform>-post` skill with a prepended draft-caption + screenshot step.
-3. **LinkedIn end-to-end live test** — login worked, but the post flow is documented but unverified live.
+1. **`/feature-post` end-to-end live-test**: skill is written (`.claude/skills/feature-post/SKILL.md`) but hasn't yet been invoked as a single slash command — every component step (sim capture, padding, drafting, posting to LI/IG/X) was exercised manually 2026-05-04. Next feature ship → use `/feature-post` to validate the orchestration in one go.
+2. **X account `@swift_bible` graduated-access**: posts have reduced reach until the account engages with the timeline. Worth adding a `/x-warm` skill (or manual session) to follow + like + reply organically. Run from the timeline; no creds needed beyond saved state.
+3. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is the IG → FB cross-post toggle in IG's composer settings (no automation required). A `/facebook-post` skill would be the harder path.
+4. **TikTok**: deferred. Requires a video pipeline (animated screenshots + voiceover/captions) before any login automation makes sense.
 
 ## Known issues / gotchas
 
-- **xcodebuildmcp installed but tools don't surface in deferred-tool registry**: `claude mcp add XcodeBuildMCP -- npx -y xcodebuildmcp@latest mcp` was run; `claude mcp list` shows it as ✓ Connected. But `ToolSearch` returns no matches for it. Even `/reload-plugins` doesn't expose them. The user *believes* a fresh session will pick them up. If you're that fresh session and they appear in your tools — use them to drive the simulator (tap More → screenshot → tap History → screenshot) instead of asking the user to navigate manually.
+- **XcodeBuildMCP needs `ui-automation` workflow enabled to expose `tap` / `swipe` / `type_text` / `snapshot_ui` / `screenshot`**. The default install enables only `simulator` (build/run/install/launch). Re-add with the env var:
+  ```bash
+  claude mcp remove XcodeBuildMCP -s local
+  claude mcp add XcodeBuildMCP -e XCODEBUILDMCP_ENABLED_WORKFLOWS=simulator,device,debugging,ui-automation -- npx -y xcodebuildmcp@latest mcp
+  ```
+  Then `/reload-plugins` (no full Claude restart needed). After the tools surface, call `session_set_defaults({simulatorId: "<UDID>"})` once per session before screenshot/snapshot/tap. SwiftUI tab bars often expose `Tab Bar` group with empty `children` — fall back to coordinate taps (4 evenly-spaced tabs across the 402-pt screen → centers ≈ 50/150/250/350 at y≈832 for iPhone 17).
 - **Chrome for Testing**: do not switch back to it. Crashes on profile UI clicks.
 - **LinkedIn sidebar AM2 LLC link**: clicking the wrapper element doesn't navigate. Use the company id (`104970470`) and go directly to `https://www.linkedin.com/company/<id>/admin/`. Or `agent-browser eval` to read `a[href*="/company/"]` hrefs.
 - **`source .env` fails** because the LinkedIn password has `$`, single quote, backtick. Use `grep | cut`.

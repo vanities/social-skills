@@ -76,15 +76,21 @@ agent-browser wait $(bash scripts/jitter.sh 800 1600)
 
 ## Step 7: Add media
 
-Click the **Add media** button. A picker dialog opens — find the underlying `<input type=file>` via `agent-browser eval "Array.from(document.querySelectorAll('input[type=file]')).map(e=>({accept:e.accept,name:e.name}))"` if the visible button isn't itself a file input.
-
-Upload via the file input selector:
+Click the **Add media** button. A media editor opens with an "Upload from computer" entry. Find the underlying file input — LinkedIn uses `id=media-editor-file-selector__file-input` with `multiple=true`, accepting images and video.
 
 ```bash
-agent-browser upload "input[type=file]" "$1"
+agent-browser eval "Array.from(document.querySelectorAll('input[type=file]')).map(e=>({accept:e.accept,name:e.name,multiple:e.multiple}))"
 ```
 
-Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 1500 3000)`), then look for and click any "Done" / "Next" buttons until you're back on the compose modal with the image attached.
+Upload via the file input selector. **`agent-browser upload` accepts multiple file paths** as positional args — pass all of them in a single call to attach a multi-image post:
+
+```bash
+agent-browser upload "input[type=file]" "$1"           # single image
+# or
+agent-browser upload "input[type=file]" path1.jpg path2.jpg path3.jpg   # multi-image post
+```
+
+Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 1500 3000)`), then click **Next** in the media editor (typically `@e6` after upload) to return to the compose modal with the image(s) attached.
 
 ## Step 8: Post
 
@@ -93,6 +99,18 @@ agent-browser wait $(bash scripts/jitter.sh 1500 3500) && \
 agent-browser click @<post-ref> && \
 agent-browser wait 4000
 ```
+
+## Step 8b: Dismiss the post-publish upsell
+
+After publishing, LinkedIn often shows an **"Auto-invite people to follow your Page when they engage with your posts"** promo (Premium upsell, "Redeem 1 month for $0"). Snapshot, find the **"No thanks"** button, click it. Skipping this leaves the modal blocking later automation.
+
+```bash
+agent-browser snapshot -i 2>&1 | head -10
+agent-browser click @<no-thanks-ref>
+agent-browser wait 1500
+```
+
+The snapshot at this point also includes a **"View post"** link — capture its href if you want a permalink for the run log.
 
 ## Step 9: Verify and write the run log
 
