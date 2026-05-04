@@ -4,23 +4,43 @@
 # Run once at the start of a work session. agent-browser commands afterwards
 # attach to the running daemon, so skills don't need to re-pass --profile.
 #
-# Profile path is overridable via SOCIAL_AGENTS_CHROME_PROFILE.
+# Defaults to your installed Google Chrome (more stable than Chrome for Testing,
+# supports real extensions like uBlock via the web store, and behaves like a
+# normal browser when you click into chrome:// pages).
+#
+# Overridable env:
+#   SOCIAL_AGENTS_CHROME_PROFILE  — profile dir (default: ~/.social-agents/chrome-profile)
+#   SOCIAL_AGENTS_CHROME_BINARY   — Chrome executable (default: /Applications/Google Chrome.app/...)
 
 set -euo pipefail
 
 PROFILE="${SOCIAL_AGENTS_CHROME_PROFILE:-$HOME/.social-agents/chrome-profile}"
+CHROME_BIN="${SOCIAL_AGENTS_CHROME_BINARY:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+
 mkdir -p "$PROFILE"
 
-# Open IG by default. Other platforms (TikTok, LinkedIn, X) can be opened
-# manually as new tabs.
-agent-browser --profile "$PROFILE" --headed open https://www.instagram.com/
+if [ ! -x "$CHROME_BIN" ]; then
+  echo "[error] Chrome binary not found at: $CHROME_BIN" >&2
+  echo "Install Google Chrome from https://www.google.com/chrome/ or set SOCIAL_AGENTS_CHROME_BINARY." >&2
+  exit 1
+fi
+
+# --disable-blink-features=AutomationControlled removes the navigator.webdriver
+# flag IG and others use to detect automation. Other flags are anti-noise.
+agent-browser \
+  --executable-path "$CHROME_BIN" \
+  --profile "$PROFILE" \
+  --headed \
+  --args "--disable-blink-features=AutomationControlled,--disable-features=ChromeWhatsNewUI" \
+  open https://www.instagram.com/
 
 echo
-echo "Browser is up. Profile: $PROFILE"
-echo "Daemon-attached commands now use this profile automatically."
+echo "Browser is up. Profile:  $PROFILE"
+echo "Chrome binary:          $CHROME_BIN"
+echo "Daemon-attached commands now use this Chrome + profile automatically."
 echo
 echo "Next:"
-echo "  - Install uBlock Origin (one-time, persists in this profile)."
+echo "  - Install uBlock Origin from chrome web store (one-time, persists)."
 echo "  - If IG isn't already signed in:"
 echo "      agent-browser state load ~/.config/agent-browser/instagram-swiftbible.json"
 echo "      agent-browser open https://www.instagram.com/"
