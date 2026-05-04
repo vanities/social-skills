@@ -91,10 +91,17 @@ The script `cd`s into the repo and runs `claude --print "/post-daily-devotional"
 
 ## In-flight work (next session resumes here)
 
-1. **`/feature-post` end-to-end live-test**: skill is written (`.claude/skills/feature-post/SKILL.md`) but hasn't yet been invoked as a single slash command — every component step (sim capture, padding, drafting, posting to LI/IG/X) was exercised manually 2026-05-04. Next feature ship → use `/feature-post` to validate the orchestration in one go.
-2. **X account `@swift_bible` graduated-access**: posts have reduced reach until the account engages with the timeline. Worth adding a `/x-warm` skill (or manual session) to follow + like + reply organically. Run from the timeline; no creds needed beyond saved state.
-3. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is the IG → FB cross-post toggle in IG's composer settings (no automation required). A `/facebook-post` skill would be the harder path.
-4. **TikTok**: deferred. Requires a video pipeline (animated screenshots + voiceover/captions) before any login automation makes sense.
+1. **Engagement / warming system across X, Pinterest, Instagram** — pure-broadcast accounts get throttled on all three; X also has a "graduated access" soft-restriction on `@swift_bible` until the account engages organically. Designed but not yet built:
+   - **Architecture**: per-platform `.claude/skills/{x,pinterest,instagram}-warm/SKILL.md` (each knows its platform's verbs — Pinterest "save to board" / X "like + retweet" / IG "like + follow") + meta-skill `/warm-all` that rotates platforms with intra-run jitter + a single config `engagement-schedule.json` (daily action budgets, time windows, account-rotation order, follow-list seeds).
+   - **What to automate**: scroll feed, like, save (Pinterest), follow from a curated list, repost / repin from already-followed accounts.
+   - **What to NOT automate**: comments. Generic auto-comments are the highest-risk bot-detection signal on all three platforms. Either skip entirely or use a "skill drafts → user approves → skill posts" pattern.
+   - **Cadence**: start mild — 3–7 actions/platform/day with wide time jitter (e.g. between 8am–10pm with random gaps ≥90 minutes; never two platforms in the same hour). Ramp up only after the X account graduates. Aggressive day-1 engagement is exactly what flags accounts.
+   - **Scheduling**: macOS cron firing `claude --print "/warm-all"` at 2–3 staggered times per day. The skill itself adds randomization (which platforms touched, how many actions, in what order). Same pattern as the existing `daily_devotional.sh` cron entry.
+   - **Effort**: ~3–5 hours to build out properly + a day of supervised running to tune the cadence before letting it run unattended.
+2. **`/feature-post` end-to-end live-test**: skill written, every component exercised manually but never as a single invocation. Next feature ship → invoke `/feature-post` to validate.
+3. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is creating an AM2 LLC Page → linking to IG via Meta Accounts Center → enable the IG composer's cross-post toggle (no automation required). `/facebook-post` is the harder route if that toggle isn't reliably visible on web.
+4. **Bluesky**: similar architecture to X minus the graduated-access friction (~1hr to mirror `/x-login` + `/x-post`). Not started.
+5. **TikTok / YouTube Shorts**: deferred until a video pipeline exists (animated screenshots + voiceover/captions). See `.claude/skills/tiktok-post/SKILL.md` for the three unblock paths.
 
 ## Known issues / gotchas
 
