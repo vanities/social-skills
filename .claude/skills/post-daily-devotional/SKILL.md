@@ -7,7 +7,7 @@ allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(test *) Bash(date 
 
 # Post today's iOS-simulator devotional to Instagram
 
-Account: `adam` (override via `$SOCIAL_AGENTS_IG_ACCOUNT`).
+Account: `swiftbible` (override via `$SOCIAL_AGENTS_IG_ACCOUNT`).
 Reference: `docs/platforms/instagram.md`.
 
 ## Step 1: Verify the simulator is booted
@@ -36,7 +36,7 @@ test -f ~/.social-agents/daily-devotional-caption.txt && cat ~/.social-agents/da
 
 Invoke `/instagram-post` with:
 
-- account = `${SOCIAL_AGENTS_IG_ACCOUNT:-adam}`
+- account = `${SOCIAL_AGENTS_IG_ACCOUNT:-swiftbible}`
 - media = `/tmp/daily-devotional-$(date +%Y-%m-%d).png`
 - caption = output of step 3 (empty string if the file didn't exist)
 
@@ -48,4 +48,4 @@ After `/instagram-post` completes, summarize:
 - Outcome (success / specific failure step).
 - Path of the verification screenshot from `/instagram-post`.
 
-If `/instagram-post` reported "STATE MISSING", tell the user to run `/instagram-login ${SOCIAL_AGENTS_IG_ACCOUNT:-adam}` first.
+If `/instagram-post` reported "STATE MISSING", tell the user to run `/instagram-login ${SOCIAL_AGENTS_IG_ACCOUNT:-swiftbible}` first.
