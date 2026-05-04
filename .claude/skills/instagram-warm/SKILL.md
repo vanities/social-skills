@@ -47,22 +47,37 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s).
 
 ### like
 
-IG's home feed renders posts as a vertical stack. Each post has a Like button (heart icon) — its accessibility label is `Like` (or `Unlike` once liked). The Like button typically lives inside an article element with the post's author handle.
+IG's home feed renders posts as a vertical stack. Each post has a Like button rendered as an **`<svg aria-label="Like">` inside a `<div role="button">`**. The accessibility tree presents these as `button "Like"`, but the actual clickable target is the parent div, NOT the SVG itself. The aria-label flips to `Unlike` after a successful like.
+
+**Critical**: agent-browser's snapshot @e refs for these "Like" buttons frequently fail to register a click — IG's React handler ignores synthesized clicks on elements that are off-screen. Use this pattern instead:
+
+1. Find all Like SVGs via `querySelectorAll('svg[aria-label="Like"]')`
+2. Walk up to the nearest `[role=button]` ancestor — that's the clickable
+3. Mark it with a unique id via eval
+4. **`scrollIntoView({block:'center'})` BEFORE clicking** — this is what made the live test pass after several no-ops
+5. `agent-browser click "#<id>"` — now the click triggers the React handler
+6. Verify by checking the SVG's aria-label flipped to `Unlike`
 
 ```bash
-# 1. Snapshot, find Like buttons on visible posts
-agent-browser snapshot -i 2>&1 | grep -E 'button "Like".*\[ref=' | head -10 > /tmp/ig-likes.txt
-# Filter out posts authored by @swift_bible (own posts) — author appears in the surrounding article context.
+# Step 1-3: pick a random Like target, mark it
+agent-browser eval "(()=>{const ss=Array.from(document.querySelectorAll('svg[aria-label=\"Like\"]'));const i=Math.floor(Math.random()*ss.length);let e=ss[i];while(e&&e.getAttribute('role')!=='button'&&e.parentElement)e=e.parentElement;e.id='ig-like-target';return {i,marked:e?.id}})()"
 
-# 2. Pick one randomly
-PICK=$(grep -oE 'ref=e[0-9]+' /tmp/ig-likes.txt | shuf -n 1 | cut -d= -f2)
-agent-browser click "@$PICK"
-agent-browser wait $(bash scripts/jitter.sh 4000 12000)
+# Step 4: scroll into view (REQUIRED — without this the click silently fails)
+agent-browser eval "document.querySelector('#ig-like-target')?.scrollIntoView({block:'center',behavior:'smooth'})"
+agent-browser wait $(bash scripts/jitter.sh 1500 2500)
 
-# 3. Verify — re-snapshot and confirm the same ref's button is now "Unlike"
+# Step 5: click
+agent-browser click "#ig-like-target"
+agent-browser wait $(bash scripts/jitter.sh 4000 10000)
+
+# Step 6: verify — SVG aria-label should now read "Unlike"
+agent-browser eval "document.querySelector('#ig-like-target svg')?.getAttribute('aria-label')"
+# expected output: "Unlike"
 ```
 
-Increment `state.instagram.actions_today.like` by 1.
+Increment `state.instagram.actions_today.like` by 1 only after the verify step confirms the flip; if it still says "Like", retry once with another scroll-into-view, otherwise log skip and don't increment.
+
+To filter out own posts before selecting, find the author handle by walking up to the enclosing `<article>` and reading the post header text. For day-1 warming, the random pick is fine — odds of hitting your own post in a feed of 9+ are low.
 
 After each action, persist state immediately via `command mv -f` (macOS aliases `mv` to `mv -i`):
 

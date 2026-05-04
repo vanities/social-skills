@@ -61,13 +61,15 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s).
 The home feed shows pins as `button "Pin card"` elements with refs `@e14`, `@e15`, …. Save buttons are NOT in the DOM until you hover or click into the pin detail. The reliable flow is **click pin → save from detail page → navigate back**.
 
 ```bash
-# 1. Snapshot, find pin card refs
-agent-browser snapshot -i 2>&1 | grep -E 'button "Pin card" \[ref=' | head -20
+# 1. Find pin URLs directly via DOM (snapshot @e refs for Pin cards DO NOT click reliably —
+#    Pinterest renders pin cards as React buttons that don't respond to synthesized clicks).
+PIN_PATH=$(agent-browser eval "Array.from(document.querySelectorAll('a[href*=\"/pin/\"]')).slice(0,12).map(a=>a.href.match(/\\/pin\\/[0-9]+/)?.[0]).filter(Boolean)" \
+  | tail -20 | grep '/pin/' | tr -d '"', | shuf -n 1 | tr -d ' ')
 
-# 2. Pick one randomly
-PICK_REF=$(grep -oE 'ref=e[0-9]+' /tmp/pin-cards.txt | shuf -n 1 | cut -d= -f2)
-agent-browser click "@$PICK_REF"
-agent-browser wait $(bash scripts/jitter.sh 1500 3000)   # land on /pin/<id>/
+# 2. Navigate directly to the pin
+agent-browser open "https://www.pinterest.com${PIN_PATH}/"
+agent-browser wait --load networkidle
+agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 
 # 3. Find Save button on detail page (typically @e34) — re-snapshot
 agent-browser snapshot -i 2>&1 | grep -E '"Save".*\[ref=' | head -3
