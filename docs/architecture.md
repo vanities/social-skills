@@ -2,7 +2,29 @@
 
 ## The browser
 
-We run **one persistent headed Chrome** that the user and the agent share. Each social platform lives in its own tab. The browser survives across Claude Code sessions; you (the user) can poke at it any time, and skills find their tab and pick up where you left off.
+We run **one persistent headed Chrome** that the user and the agent share, backed by a **dedicated automation profile** so extensions (uBlock Origin) and login state survive close/restart. Each social platform lives in its own tab. The browser survives across Claude Code sessions; you (the user) can poke at it any time, and skills find their tab and pick up where you left off.
+
+## Profile
+
+Default path: `~/.social-agents/chrome-profile/` (override via `SOCIAL_AGENTS_CHROME_PROFILE`).
+
+Launch the browser at the start of a work session:
+
+```bash
+bash scripts/launch_browser.sh
+```
+
+That runs `agent-browser --profile <path> --headed open https://www.instagram.com/`. Subsequent `agent-browser` commands attach to the running daemon and pick up the profile automatically — skills don't re-pass `--profile`.
+
+What lives in the profile:
+
+- Extensions (install uBlock once; persists)
+- Cookies + localStorage for every site you've signed into
+- History, autofill, etc.
+
+What doesn't:
+
+- The Chrome variant agent-browser uses is "Chrome for Testing" (different binary from your everyday Chrome), so this profile is fully isolated from your normal browsing.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -32,9 +54,10 @@ Every skill that targets a platform follows the same pattern:
 State files at `~/.config/agent-browser/<platform>-<account>.json` are a **backup**, used when:
 
 - The persistent browser isn't running (cron at noon, fresh boot).
-- The user wants to seed a new browser instance with a known good session.
+- The user wants to seed a new browser instance with a known good session (e.g. when migrating to a new profile).
+- Recovery — if a profile gets corrupted, `state load <path>` restores cookies into a fresh profile.
 
-In normal interactive use, the persistent browser keeps cookies + storage and state files don't get touched.
+In normal interactive use, the persistent profile keeps cookies + storage and state files don't get touched. Re-save state periodically (`agent-browser state save ...`) so the backup is current.
 
 ## Cron flow (cold start)
 
