@@ -1,6 +1,6 @@
 ---
 name: instagram-login
-description: Log into an Instagram account. If .env has INSTAGRAM_<ACCOUNT>_USERNAME / _PASSWORD set, signs in automatically; otherwise pauses for manual sign-in. Always logs the form fields it found so we can detect IG UI changes. Use when the user says "log in to instagram" or runs /instagram-login.
+description: Log into an Instagram account in the shared headed Chrome. If .env has INSTAGRAM_<ACCOUNT>_USERNAME / _PASSWORD set, signs in automatically; otherwise pauses for manual sign-in. Always logs the form fields it found so we can detect IG UI changes. Use when the user says "log in to instagram" or runs /instagram-login.
 disable-model-invocation: true
 argument-hint: [account-label]
 allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bash(grep *) Bash(cat *) Bash(source *) Read(.env)
@@ -8,10 +8,11 @@ allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bas
 
 # Instagram login for account `$0`
 
-State path: `~/.config/agent-browser/instagram-$0.json`
-Log path:   `~/.social-agents/logs/login/instagram-$0-<timestamp>.json`
+State path (backup, for cron / cold-start runs): `~/.config/agent-browser/instagram-$0.json`
+Log path: `~/.social-agents/logs/login/instagram-$0-<timestamp>.json`
+Reference: `docs/platforms/instagram.md`.
 
-See `docs/platforms/instagram.md` for the full IG playbook.
+The default mode of operation is the **shared headed Chrome** — keep the browser alive across sessions so the user and the agent both work in it. State files exist as a fallback for fresh-process runs (cron).
 
 ## Decide auto vs manual
 
@@ -19,11 +20,16 @@ See `docs/platforms/instagram.md` for the full IG playbook.
 grep -q "^INSTAGRAM_$(echo "$0" | tr '[:lower:]' '[:upper:]')_USERNAME=" .env 2>/dev/null && echo "MODE: auto" || echo "MODE: manual"
 ```
 
-## Open the login page
+## Find or open the Instagram tab
 
 ```!
-agent-browser open https://www.instagram.com/accounts/login/ && agent-browser wait --load networkidle
+agent-browser tab list 2>&1
 ```
+
+- If a tab matches `instagram.com`, switch to it: `agent-browser tab <index>`. Then check `agent-browser get url` — if it's already on a feed URL (not `/accounts/login/`), the user is already signed in and you can skip to "Save state".
+- If no IG tab: `agent-browser --headed tab new https://www.instagram.com/accounts/login/` (or `agent-browser --headed open ...` if there are zero tabs at all).
+
+Always `agent-browser wait --load networkidle` after.
 
 ## Snapshot the login form
 
@@ -31,13 +37,13 @@ agent-browser open https://www.instagram.com/accounts/login/ && agent-browser wa
 agent-browser snapshot -i 2>&1 | grep -E '(textbox|button "Log)' | head -10
 ```
 
-From the output above, identify the `@refs` for:
+From the output, identify the `@refs` for:
 
 - Username textbox (label like "Mobile number, username or email")
 - Password textbox (label "Password")
 - "Log In" button
 
-**You must record these refs in the run log** (Step "Write the run log" below). If Instagram changes the form layout, the log is how we'll see it.
+**You must record these refs in the run log** (Step "Write the run log" below). If Instagram changes the form, the log is how we'll see it.
 
 ## Sign in
 
@@ -56,20 +62,18 @@ agent-browser click @<LOGIN_REF> && \
 agent-browser wait --load networkidle
 ```
 
-### Manual mode (no creds)
+### Manual mode
 
 Tell the user:
 
-> Sign in in the browser, including any 2FA. Dismiss any "Save your info" or notifications dialogs. Reply "done" when you're signed in and on the home feed.
-
-Wait for the user's "done" before continuing.
+> Sign in in the Chrome tab, including any 2FA. Reply "done" when you're on the home feed.
 
 ## Handle post-login dialogs
 
-Snapshot again. Common dialogs:
+Snapshot. Common dialogs:
 
-- **"Save your login info?"** at `/accounts/onetap/` → click the "Not now" button.
-- **"Turn on notifications"** → click "Not now".
+- **"Save your login info?"** at `/accounts/onetap/` → click **"Not now"**.
+- **"Turn on Notifications"** → click **"Not Now"**.
 - **2FA challenge** → in auto mode, abort and tell the user to do `/instagram-login $0` again manually; in manual mode, the user has already handled it.
 
 For each dialog dismissed, record `{ref, label, context}` for the run log.
@@ -80,9 +84,9 @@ For each dialog dismissed, record `{ref, label, context}` for the run log.
 agent-browser get url
 ```
 
-The URL should be `https://www.instagram.com/` or another feed URL. If it's still on `/accounts/login/`, the login failed — capture a snapshot, write the log with `outcome: failed` and the snapshot inline, then abort.
+Expected: `https://www.instagram.com/`. If still on `/accounts/login/`, capture a snapshot, write the log with `outcome: failed` + the snapshot inline, then abort.
 
-## Save state
+## Save state (backup)
 
 ```!
 mkdir -p ~/.config/agent-browser ~/.social-agents/logs/login && agent-browser state save ~/.config/agent-browser/instagram-$0.json
@@ -90,44 +94,40 @@ mkdir -p ~/.config/agent-browser ~/.social-agents/logs/login && agent-browser st
 
 ## Write the run log
 
-Use the `Write` tool to create a JSON file at `~/.social-agents/logs/login/instagram-$0-<timestamp>.json` with this exact shape (substitute real values):
+Use the `Write` tool to create `~/.social-agents/logs/login/instagram-$0-<timestamp>.json`:
 
 ```json
 {
-  "ts_start": "2026-05-04T17:04:00Z",
-  "ts_end":   "2026-05-04T17:04:34Z",
+  "ts_start": "<ISO 8601 UTC>",
+  "ts_end":   "<ISO 8601 UTC>",
   "platform": "instagram",
   "account":  "$0",
   "action":   "login",
-  "mode":     "auto",
-  "outcome":  "success",
+  "mode":     "auto | manual",
+  "outcome":  "success | 2fa_required | failed",
+  "tab_strategy": "switched | opened-new | already-signed-in",
   "form_fields_discovered": {
-    "username_field":  "@e71",
-    "username_label":  "Mobile number, username or email",
-    "password_field":  "@e72",
-    "password_label":  "Password",
-    "login_button":    "@e73",
-    "login_button_label": "Log In"
+    "username_field":     "@<ref>",
+    "username_label":     "<label>",
+    "password_field":     "@<ref>",
+    "password_label":     "<label>",
+    "login_button":       "@<ref>",
+    "login_button_label": "<label>"
   },
   "post_login_dialogs_dismissed": [
-    { "ref": "@e3", "label": "Not now", "context": "Save your login info? at /accounts/onetap/" }
+    { "ref": "@<ref>", "label": "<button label>", "context": "<page url or descriptor>" }
   ],
-  "final_url":  "https://www.instagram.com/",
+  "final_url":  "<url>",
   "state_file": "/Users/vanities/.config/agent-browser/instagram-$0.json"
 }
 ```
 
-Substitute `<timestamp>` with the value of `date +%Y-%m-%dT%H-%M-%S` (no `:` in filenames).
+Substitute `<timestamp>` with `date +%Y-%m-%dT%H-%M-%S`.
 
-## Close
+## Report
 
-```!
-agent-browser close
-```
+- Account label, state file path, log file path.
+- Tab where IG is now (so the user can find it).
+- Whether `/instagram-post $0 …` or `/post-daily-devotional` is ready to run.
 
-Confirm to the user:
-
-- Account label.
-- State file path.
-- Log file path.
-- Whether they can now run `/instagram-post $0 …` or `/post-daily-devotional`.
+**Do not close the tab.** The shared browser stays open.
