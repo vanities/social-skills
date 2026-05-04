@@ -1,32 +1,19 @@
-# Python
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
+.DS_Store
 
 # Secrets
 .env
 .env.*
 !.env.example
 
-# Browser profiles & media (live in $HOME/.social-agents by default,
-# but never commit them if someone overrides paths into the repo).
+# Browser state, media, logs live under $HOME/.config/agent-browser/
+# and $HOME/.social-agents/. These entries are defensive in case anyone
+# overrides paths into the repo.
 profiles/
 sessions/
 media/
+logs/
 
 # Editor / OS
-.DS_Store
 .idea/
 .vscode/
 *.swp
-
-# Test caches
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
