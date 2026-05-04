@@ -37,6 +37,20 @@ Start a work session:
 bash scripts/launch_browser.sh
 ```
 
+## Engagement / warming system
+
+Built 2026-05-04. **Per-platform warm skills + meta-orchestrator**:
+- `config/engagement-schedule.json` — daily action budgets, time windows, weights, jitter ranges
+- `~/.social-agents/state/engagement-state.json` — per-platform `last_run_iso` + today's action counts
+- `~/.social-agents/logs/warm/<platform>-<account>-<ts>.json` — per-run logs
+
+**One platform per `/warm-all` invocation.** Cron fires `/warm-all` ~3× daily at staggered minutes; each call picks the most-stale eligible platform (respecting `min_gap_minutes_between_platforms` and `daily_action_budget`) and runs its warm skill. Never run all three back-to-back.
+
+**Hard rules baked into the skills**:
+- **No auto-comments anywhere** — the highest-risk bot-detection signal on every platform.
+- **No auto-follow on IG / X for now** — too aggressive for fresh accounts; Pinterest follow is allowed but rare.
+- **macOS shell gotchas**: `mv` is aliased to `mv -i` (use `command mv -f`); the project shell is **zsh**, not bash, so `arr=($var)` does NOT word-split — use `shuf` over heredoc'd line lists for randomization.
+
 ## Conventions every skill follows
 
 1. **Tab-aware**: `agent-browser tab list`, switch into existing platform tab if present (`agent-browser tab <index>`, NOT `tab switch <index>` — that subcommand doesn't exist), else `tab new <url>`. Never close the tab.
@@ -68,6 +82,10 @@ bash scripts/launch_browser.sh
 | `/tiktok-post` | DEFERRED. TikTok's web upload is **video-only** (Photo Mode is mobile-app exclusive). Skill documents the blocker + 3 unblock paths (real video pipeline, image-to-video helper, iOS-app automation via XcodeBuildMCP). | 🚫 Blocked on video content / video pipeline |
 | `/pinterest-login` | Auto via `PINTEREST_USERNAME` / `PINTEREST_PASSWORD`. Pauses for any CAPTCHA challenge. | ✅ State saved 2026-05-04 (user signed in manually via .env email/password; auto-login via skill not yet exercised) |
 | `/pinterest-post <pin-json>` | Reads JSON `{media, title, description, board, link?}`. Tall iPhone screenshots fit natively (no padding). Creates the board inline if it doesn't exist. | ✅ Live-tested 2026-05-04 (first pin: "James 2:12" daily devotional in board "Daily Devotionals" on `pinterest.com/swiftbible`) |
+| `/x-warm` | One warming pass on `@swift_bible` — scroll feed + 1-3 likes + maybe 1 repost. Reads `config/engagement-schedule.json`, updates `~/.social-agents/state/engagement-state.json`. Skips comments + own tweets. | ✅ Live-tested 2026-05-04 (1 scroll pass + 1 like on @Bible365_'s tweet; verified via Like→Liked aria-label flip) |
+| `/pinterest-warm` | One warming pass on `swiftbible` — scroll feed + 1-4 saves (default board "Profile") + maybe 1 follow. | ✅ Save-action live-tested (saved 1 pin via click→detail→Save flow); skill itself not yet invoked end-to-end |
+| `/instagram-warm` | One warming pass on `swift_bible` — scroll feed + 1-3 likes. **No follow / comment** (IG is the strictest about bot-detection). | ⚠️ Skill written, not yet live-tested; mirrors `/x-warm` UI patterns |
+| `/warm-all` | Picks the most-stale eligible platform and runs its warm skill once. Designed to be cron'd 2-3× daily at staggered times. | ⚠️ Written, not yet live-tested |
 
 ## Live state (as of 2026-05-04)
 
@@ -91,17 +109,13 @@ The script `cd`s into the repo and runs `claude --print "/post-daily-devotional"
 
 ## In-flight work (next session resumes here)
 
-1. **Engagement / warming system across X, Pinterest, Instagram** — pure-broadcast accounts get throttled on all three; X also has a "graduated access" soft-restriction on `@swift_bible` until the account engages organically. Designed but not yet built:
-   - **Architecture**: per-platform `.claude/skills/{x,pinterest,instagram}-warm/SKILL.md` (each knows its platform's verbs — Pinterest "save to board" / X "like + retweet" / IG "like + follow") + meta-skill `/warm-all` that rotates platforms with intra-run jitter + a single config `engagement-schedule.json` (daily action budgets, time windows, account-rotation order, follow-list seeds).
-   - **What to automate**: scroll feed, like, save (Pinterest), follow from a curated list, repost / repin from already-followed accounts.
-   - **What to NOT automate**: comments. Generic auto-comments are the highest-risk bot-detection signal on all three platforms. Either skip entirely or use a "skill drafts → user approves → skill posts" pattern.
-   - **Cadence**: start mild — 3–7 actions/platform/day with wide time jitter (e.g. between 8am–10pm with random gaps ≥90 minutes; never two platforms in the same hour). Ramp up only after the X account graduates. Aggressive day-1 engagement is exactly what flags accounts.
-   - **Scheduling**: macOS cron firing `claude --print "/warm-all"` at 2–3 staggered times per day. The skill itself adds randomization (which platforms touched, how many actions, in what order). Same pattern as the existing `daily_devotional.sh` cron entry.
-   - **Effort**: ~3–5 hours to build out properly + a day of supervised running to tune the cadence before letting it run unattended.
-2. **`/feature-post` end-to-end live-test**: skill written, every component exercised manually but never as a single invocation. Next feature ship → invoke `/feature-post` to validate.
-3. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is creating an AM2 LLC Page → linking to IG via Meta Accounts Center → enable the IG composer's cross-post toggle (no automation required). `/facebook-post` is the harder route if that toggle isn't reliably visible on web.
-4. **Bluesky**: similar architecture to X minus the graduated-access friction (~1hr to mirror `/x-login` + `/x-post`). Not started.
-5. **TikTok / YouTube Shorts**: deferred until a video pipeline exists (animated screenshots + voiceover/captions). See `.claude/skills/tiktok-post/SKILL.md` for the three unblock paths.
+1. **Wire up cron for `/warm-all`** — three staggered slots per day (e.g. `:17 09 * * *`, `:43 13 * * *`, `:22 18 * * *`). Sample crontab is in `.claude/skills/warm-all/SKILL.md`. Validate by leaving it running for a few days and checking the run logs in `~/.social-agents/logs/warm/`.
+2. **Live-test `/pinterest-warm`, `/instagram-warm`, `/warm-all`** as full skill invocations. The component actions (scroll, like on X, save on Pinterest) have all been exercised manually 2026-05-04, but the skills themselves haven't been invoked as single slash commands.
+3. **Daily devotional fan-out**: today's `/post-daily-devotional` only posts to IG. Per the cadence agreement, it should fan out to **IG + X + Pinterest** (NOT LinkedIn — feature posts only there). Refactor: `/post-daily-devotional` should call `/instagram-post`, `/x-post`, AND `/pinterest-post` in sequence, each with platform-tailored caption + the same padded screenshot. Add this to the cron so 12pm daily fans across all three.
+4. **`/feature-post` end-to-end live-test**: skill written, every component exercised manually but never as a single invocation. Next feature ship → invoke `/feature-post` to validate.
+5. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is creating an AM2 LLC Page → linking to IG via Meta Accounts Center → enable the IG composer's cross-post toggle (no automation required). `/facebook-post` is the harder route if that toggle isn't reliably visible on web.
+6. **Bluesky**: similar architecture to X minus the graduated-access friction (~1hr to mirror `/x-login` + `/x-post`). Not started.
+7. **TikTok / YouTube Shorts**: deferred until a video pipeline exists. See `.claude/skills/tiktok-post/SKILL.md`.
 
 ## Known issues / gotchas
 

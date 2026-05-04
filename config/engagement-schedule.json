@@ -1,0 +1,51 @@
+{
+  "_comment": "Engagement / warming config for X, Pinterest, Instagram. Per-platform daily action budgets and time windows. Skills read this; the user edits it.",
+  "global": {
+    "active_hours": {"start": 8, "end": 22},
+    "min_gap_minutes_between_platforms": 90,
+    "platform_rotation": ["x", "pinterest", "instagram"],
+    "_note": "platform_rotation order is shuffled each run; this is the seed order. min_gap_minutes_between_platforms is enforced via state file timestamps."
+  },
+  "platforms": {
+    "x": {
+      "enabled": true,
+      "daily_action_budget": {"min": 3, "max": 7},
+      "actions": {
+        "scroll":  {"weight": 5, "items_to_view": {"min": 5, "max": 12}},
+        "like":    {"weight": 4, "max_per_run": 3},
+        "repost":  {"weight": 1, "max_per_run": 1}
+      },
+      "_skipped_actions": ["follow", "comment"],
+      "_skipped_reason": "follow + comment are higher bot-detection signals; add later after graduating",
+      "feed_url": "https://x.com/home"
+    },
+    "pinterest": {
+      "enabled": true,
+      "daily_action_budget": {"min": 4, "max": 10},
+      "actions": {
+        "scroll":  {"weight": 5, "items_to_view": {"min": 8, "max": 20}},
+        "save":    {"weight": 4, "max_per_run": 4, "default_board": "Daily Devotionals"},
+        "follow":  {"weight": 1, "max_per_run": 1}
+      },
+      "_skipped_actions": ["comment"],
+      "_skipped_reason": "Pinterest is more lenient than X/IG; follow is fine here. Comments still skipped.",
+      "feed_url": "https://www.pinterest.com/"
+    },
+    "instagram": {
+      "enabled": true,
+      "daily_action_budget": {"min": 3, "max": 6},
+      "actions": {
+        "scroll":  {"weight": 6, "items_to_view": {"min": 6, "max": 12}},
+        "like":    {"weight": 3, "max_per_run": 3}
+      },
+      "_skipped_actions": ["follow", "comment"],
+      "_skipped_reason": "IG is the most aggressive about bot-detection signals; start with scroll + like only",
+      "feed_url": "https://www.instagram.com/"
+    }
+  },
+  "jitter": {
+    "_comment": "All durations are milliseconds. Use scripts/jitter.sh to sample.",
+    "between_actions_in_run": {"min": 4000, "max": 18000},
+    "between_scroll_pauses": {"min": 2000, "max": 6000}
+  }
+}
