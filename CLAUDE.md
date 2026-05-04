@@ -4,12 +4,12 @@
 
 ## What this is
 
-Skill-driven social media automation across Instagram, LinkedIn (and later TikTok / X / Facebook). The agent (Claude Code, OAuth-authed) reads SKILL.md playbooks and drives a real Chrome browser via the `agent-browser` CLI. **No platform APIs, no Python framework, no `ANTHROPIC_API_KEY`.**
+Skill-driven social media automation across Instagram, LinkedIn, X, Pinterest (live), TikTok (deferred), and Facebook / Bluesky / YouTube Shorts (TBD). The agent (Claude Code, OAuth-authed) reads SKILL.md playbooks and drives a real Chrome browser via the `agent-browser` CLI. **No platform APIs, no Python framework, no `ANTHROPIC_API_KEY`.**
 
 See:
 - `README.md` — high-level overview
 - `docs/architecture.md` — shared-browser model, profile, state
-- `docs/platforms/<name>.md` — per-platform playbooks
+- `docs/platforms/<name>.md` — per-platform playbooks (only `instagram.md` and `linkedin.md` exist; the rest live inside their skill files)
 - `.claude/skills/<name>/SKILL.md` — verbs Claude can invoke
 
 ## Hard rules (set by the user; do not relitigate)
@@ -30,7 +30,8 @@ cron / interactive trigger  →  SKILL.md playbook  →  Claude (OAuth)  →  ag
 - **Chrome binary**: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` (override: `SOCIAL_AGENTS_CHROME_BINARY`)
 - **Anti-automation flag**: `--disable-blink-features=AutomationControlled` (strips `navigator.webdriver`)
 - **Backup state files**: `~/.config/agent-browser/<platform>-<account>.json`
-- **Logs**: `~/.social-agents/logs/{cron,login,post}/...`
+- **Engagement state**: `~/.social-agents/state/engagement-state.json` (last-run + today's action counts per platform)
+- **Logs**: `~/.social-agents/logs/{cron,login,post,warm}/...`
 
 Start a work session:
 ```bash
@@ -63,9 +64,10 @@ Built 2026-05-04. **Per-platform warm skills + meta-orchestrator**:
 5. **Pre-pad iPhone screenshots before posting**: raw iOS simulator screenshots are ~9:19.5, well outside Instagram's allowed range. `bash scripts/pad_ios_screenshot.sh <input> [output] [mode]` pads to 4:5 with seamless edge color (default), an Apple-style blurred background (`blur`), a random palette color (`random`), or a hex color. Skill steps that take iPhone screenshots should always pass through this script first.
 6. **Form-field logging mandatory**: every login/post run writes `~/.social-agents/logs/<action>/<platform>-<account>-<ts>.json` with the `@refs` it discovered. If a platform changes its UI, this is the breadcrumb that makes it easy to update the skill.
 7. **`.env` parsing**: don't `source .env` — passwords contain `$`, backticks, etc. that re-evaluate. Use `grep -m1 '^KEY=' .env | cut -d= -f2-` to extract literal values.
-8. **Per-platform credential format**:
+8. **Per-platform credential format** (see `.env.example` for the full list):
    - Instagram: `INSTAGRAM_<ACCOUNT_LABEL>_USERNAME` / `_PASSWORD` (e.g. `INSTAGRAM_SWIFTBIBLE_*`).
-   - LinkedIn: unsplit `LINKEDIN_USERNAME` / `LINKEDIN_PASSWORD` (single account).
+   - LinkedIn / X / Pinterest: unsplit `<PLATFORM>_USERNAME` / `_PASSWORD` (single account each). X uses `TWITTER_*`.
+   - TikTok: manual-login only — auto-login isn't worth attempting against TikTok's CAPTCHA gauntlet. State at `~/.config/agent-browser/tiktok-default.json`.
 
 ## Skills available
 
@@ -150,6 +152,6 @@ Both wrappers `cd` into the repo, restore PATH for macOS cron, and invoke `claud
 
 ## Pointers
 
-- Memory: `~/.claude/projects/-Users-vanities-git-work-me/memory/social_agents_design.md`
+- Memory: `~/.claude/projects/-Users-vanities-git-work-me-social-agents/memory/`
 - User's global rules referencing `agent-browser`: `/Users/vanities/git/work/teraflop/teraflop-dev-setup/rules/validate-ui.md` and `solutions-fabric-auth.md`.
 - Repo: `git@github.com:vanities/social-agents.git` (PRIVATE, pushed 2026-05-04).
