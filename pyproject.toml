@@ -1,0 +1,22 @@
+[project]
+name = "social-agents"
+version = "0.1.0"
+description = "Pure-agent (LLM-driven browser) automation for Instagram, TikTok, LinkedIn, and X."
+readme = "README.md"
+authors = [
+    { name = "Adam Mischke", email = "mischkeaa@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "browser-use>=0.12.6",
+    "playwright>=1.59.0",
+    "rich>=14.3.1",
+    "typer>=0.25.1",
+]
+
+[project.scripts]
+social-agents = "social_agents.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.16,<0.10.0"]
+build-backend = "uv_build"

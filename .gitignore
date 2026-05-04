@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Browser profiles & media (live in $HOME/.social-agents by default,
+# but never commit them if someone overrides paths into the repo).
+profiles/
+sessions/
+media/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Test caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
