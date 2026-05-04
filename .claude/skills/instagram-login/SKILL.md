@@ -49,15 +49,17 @@ From the output, identify the `@refs` for:
 
 ### Auto mode (creds in .env)
 
-Replace `<USER_REF>`, `<PW_REF>`, `<LOGIN_REF>` with the refs from the snapshot. Do not echo the password into your response.
+Replace `<USER_REF>`, `<PW_REF>`, `<LOGIN_REF>` with the refs from the snapshot. Do not echo the password into your response. Use `type` (real keystrokes) over `fill` (instant batch) and add jitter — see `docs/platforms/instagram.md` § "Human-like timing".
 
 ```bash
 source .env && \
 ACC_UPPER="$(echo "$0" | tr '[:lower:]' '[:upper:]')" && \
 USERNAME_VAR="INSTAGRAM_${ACC_UPPER}_USERNAME" && \
 PASSWORD_VAR="INSTAGRAM_${ACC_UPPER}_PASSWORD" && \
-agent-browser fill @<USER_REF> "${!USERNAME_VAR}" && \
-agent-browser fill @<PW_REF> "${!PASSWORD_VAR}" && \
+agent-browser type @<USER_REF> "${!USERNAME_VAR}" && \
+agent-browser wait $(bash scripts/jitter.sh 300 900) && \
+agent-browser type @<PW_REF> "${!PASSWORD_VAR}" && \
+agent-browser wait $(bash scripts/jitter.sh 1200 2800) && \
 agent-browser click @<LOGIN_REF> && \
 agent-browser wait --load networkidle
 ```

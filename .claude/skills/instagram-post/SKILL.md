@@ -44,29 +44,55 @@ agent-browser snapshot -i 2>&1 | head -40
 
 ## Step 4: Click "Create" (new post)
 
-From the snapshot, find the **"Create"** / **"New post"** link (usually labeled `New post Create` in the left sidebar). Click its `@ref`. After the click, `agent-browser wait 800` and re-snapshot.
+From the snapshot, find the **"Create"** / **"New post"** link (usually labeled `New post Create` in the left sidebar). Click its `@ref`. After the click:
+
+```bash
+agent-browser wait $(bash scripts/jitter.sh 700 1500)
+```
+
+Then re-snapshot.
 
 ## Step 5: Upload the media
 
 When the upload dialog is reachable, click **"Select from computer"**. Then upload `$1`.
 
-Try `agent-browser upload <file-input-ref> "$1"` — if that fails, find the `<input type=file>` `@ref` via snapshot and run `agent-browser fill @<ref> "$1"`.
+`agent-browser upload <file-input-ref> "$1"` for the file input (this one is *not* a human-typed field, so plain upload is correct). Wait jitter after:
+
+```bash
+agent-browser wait $(bash scripts/jitter.sh 800 1800)
+```
 
 ## Step 6: Skip crop / edit screens
 
-Click **"Next"** through any crop, filter, or edit screens until the caption screen appears. Re-snapshot between clicks to track refs.
+Click **"Next"** through any crop, filter, or edit screens until the caption screen appears. Re-snapshot between clicks. Wait jitter between each:
+
+```bash
+agent-browser wait $(bash scripts/jitter.sh 600 1400)
+```
 
 ## Step 7: Enter the caption
 
-Find the caption textarea `@ref` and:
+Use `type` (real keystrokes), not `fill` — captions are user-typed content and should look that way. Find the caption textarea `@ref` and:
 
 ```text
-agent-browser fill @<caption-ref> "$2"
+agent-browser type @<caption-ref> "$2"
+```
+
+Then:
+
+```bash
+agent-browser wait $(bash scripts/jitter.sh 800 1600)
 ```
 
 ## Step 8: Share
 
-Find the **"Share"** button `@ref` and click it. `agent-browser wait 3000` to let IG process.
+Wait jitter (humans pause to re-read before posting), then click **Share**:
+
+```bash
+agent-browser wait $(bash scripts/jitter.sh 1500 3500) && \
+agent-browser click @<share-ref> && \
+agent-browser wait 3000
+```
 
 ## Step 9: Verify and write the run log
 
