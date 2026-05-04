@@ -76,21 +76,30 @@ agent-browser wait $(bash scripts/jitter.sh 800 1600)
 
 ## Step 7: Add media
 
-Click the **Add media** button. A media editor opens with an "Upload from computer" entry. Find the underlying file input — LinkedIn uses `id=media-editor-file-selector__file-input` with `multiple=true`, accepting images and video.
+### 7a: Handle any auto-attached link cards first
+
+If the caption contains a URL (e.g. `github.com/...`, a blog post, etc.), LinkedIn often auto-fetches an Open Graph link card and **occupies the single media slot with it**. You'll see `Edit media preview` + `Remove media` buttons in the compose modal even though you haven't uploaded anything. To attach your own screenshot, click **Remove media** first to free the slot — the URL stays clickable in the caption text.
 
 ```bash
-agent-browser eval "Array.from(document.querySelectorAll('input[type=file]')).map(e=>({accept:e.accept,name:e.name,multiple:e.multiple}))"
+agent-browser snapshot -i 2>&1 | grep -E '(Remove media|Edit media preview).*ref'
+agent-browser click "@<REMOVE_MEDIA_REF>"
+agent-browser wait $(bash scripts/jitter.sh 700 1500)
 ```
 
-Upload via the file input selector. **`agent-browser upload` accepts multiple file paths** as positional args — pass all of them in a single call to attach a multi-image post:
+### 7b: Click Add media + upload
+
+Click the **Add media** button. A media editor opens with an "Upload from computer" entry. **The compose modal lives inside an iframe (`https://www.linkedin.com/preload/`)** — `document.querySelectorAll('input[type=file]')` against the top document returns `[]`. The reliable upload pattern is to target the visible "Upload from computer" button by its snapshot @e ref:
 
 ```bash
-agent-browser upload "input[type=file]" "$1"           # single image
-# or
-agent-browser upload "input[type=file]" path1.jpg path2.jpg path3.jpg   # multi-image post
+agent-browser snapshot -i 2>&1 | grep -E '"Upload from computer".*ref'
+agent-browser upload "@<UPLOAD_BUTTON_REF>" "$1"          # single image
+# or for a multi-image carousel:
+agent-browser upload "@<UPLOAD_BUTTON_REF>" path1.jpg path2.jpg path3.jpg
 ```
 
-Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 1500 3000)`), then click **Next** in the media editor (typically `@e6` after upload) to return to the compose modal with the image(s) attached.
+`agent-browser upload @<ref>` correctly resolves the click target across iframes even when querySelector via the top doc does not.
+
+Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 1500 3000)`), then click **Next** in the media editor to return to the compose modal with the image(s) attached.
 
 ## Step 8: Post
 
