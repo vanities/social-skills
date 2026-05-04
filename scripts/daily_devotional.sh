@@ -14,7 +14,10 @@ echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) cron start ==="
 export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 
 # Run the skill in headless Claude Code (uses the user's existing OAuth auth).
+# --dangerously-skip-permissions: cron can't prompt. The skill captures a
+# screenshot, pads it, drafts captions, and posts to IG/X/Pinterest — all
+# operations have been validated manually beforehand.
 cd "$(dirname "$0")/.."
-claude --print "/post-daily-devotional"
+claude --print --dangerously-skip-permissions "/post-daily-devotional"
 
 echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) cron complete ==="
