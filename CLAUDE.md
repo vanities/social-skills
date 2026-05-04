@@ -65,6 +65,7 @@ bash scripts/launch_browser.sh
 | `/x-login` | Two-step username → password flow. Auto via `TWITTER_USERNAME` / `TWITTER_PASSWORD` (username can be handle, email, or phone). Pauses for any verification challenge. | ✅ Live-tested 2026-05-04 (`swiftbible@am2.biz`, no challenge surfaced) |
 | `/x-post <thread-json>` | Single tweet OR multi-tweet via reply chain. Reads JSON `[{text, media?}, ...]`. First tweet supports up to 4 images via `multiple=true` input; subsequent tweets are posted as **replies** to the previous (not in-modal threads — see skill for why). | ✅ Live-tested 2026-05-04 (1 single tweet + 1 three-tweet reply chain on `@swift_bible`) |
 | `/feature-post <description> [platforms]` | Orchestrates the full multi-platform feature-launch flow: drive iOS sim → capture screenshots → pad → draft platform-tailored captions → user approval → cross-post to LinkedIn (AM2 LLC) / IG (swiftbible) / X (swift_bible). Composes the per-platform `/<platform>-post` skills. | ⚠️ Skill written, not yet end-to-end tested as a single invocation (every component step has been exercised) |
+| `/tiktok-post` | DEFERRED. TikTok's web upload is **video-only** (Photo Mode is mobile-app exclusive). Skill documents the blocker + 3 unblock paths (real video pipeline, image-to-video helper, iOS-app automation via XcodeBuildMCP). | 🚫 Blocked on video content / video pipeline |
 
 ## Live state (as of 2026-05-04)
 
@@ -75,6 +76,7 @@ bash scripts/launch_browser.sh
 - **LinkedIn personal** (`mischkeaa@gmail.com` → `Adam Mischke`) — logged in, state saved.
 - **AM2 LLC company page** (id `104970470`) — admin access confirmed. First live post landed 2026-05-04: 2-image carousel featuring the Swift Bible iOS app's redesigned More tab + new History view (Church history, 9 eras / 29 articles). Run log at `~/.social-agents/logs/post/linkedin-104970470-2026-05-04T111757.json`.
 - **X (Twitter)** `@swift_bible` (account `swiftbible@am2.biz`) — logged in 2026-05-04, state at `~/.config/agent-browser/x-default.json`. First-day posts: (1) daily devotional tweet (May 4 — James 2:12) + screenshot, (2) 3-tweet reply chain on the More-tab/History feature with screenshots on T1 and T2. Profile shows "5 posts" because each reply counts. **X surfaced a "graduated access" soft-restriction modal after the first post** — reduced reach + DM filtering until the account engages with the timeline / follows people. Doesn't block posting; dismiss via "Got it". Worth following accounts and engaging organically to graduate.
+- **TikTok** `@swiftbible` (note: NO underscore, unlike IG/X handles) — logged in 2026-05-04 manually via the painful web sign-in (CAPTCHAs etc.; do not attempt auto-login). State at `~/.config/agent-browser/tiktok-default.json` (~539KB). **No posts yet** — `/tiktok-post` is deferred because web upload is video-only and we don't have a video pipeline. See `.claude/skills/tiktok-post/SKILL.md` for the three unblock paths. Bio: "📖 Daily devotionals from the Swift Bible app. New every day at noon." with `am2.biz/swiftbible` in the link field.
 
 ## Cron
 
