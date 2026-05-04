@@ -101,21 +101,30 @@ Built 2026-05-04. **Per-platform warm skills + meta-orchestrator**:
 
 ## Cron
 
+Installed 2026-05-04 (was previously documented but never installed). View / edit with `crontab -l` / `crontab -e`.
+
 ```cron
+# Daily devotional fan-out: noon local, posts to IG + X + Pinterest (skips LinkedIn)
 0 12 * * * /bin/bash /Users/vanities/git/work/me/social-agents/scripts/daily_devotional.sh
+
+# Engagement warming: 3 staggered slots within active hours (8-22).
+# Each fires /warm-all which picks the most-stale eligible platform (X / Pinterest / IG)
+# and runs ONE warm pass. Off-the-hour minutes (:17, :43, :22) so it doesn't look bot-clocked.
+17 9  * * * /bin/bash /Users/vanities/git/work/me/social-agents/scripts/warm_all_cron.sh
+43 13 * * * /bin/bash /Users/vanities/git/work/me/social-agents/scripts/warm_all_cron.sh
+22 18 * * * /bin/bash /Users/vanities/git/work/me/social-agents/scripts/warm_all_cron.sh
 ```
 
-The script `cd`s into the repo and runs `claude --print "/post-daily-devotional"`. Cron PATH is patched at the top of the script for macOS.
+Both wrappers `cd` into the repo, restore PATH for macOS cron, and invoke `claude --print --dangerously-skip-permissions "/<skill>"`. The flag is necessary because cron can't approve interactive permission prompts. Logs land in `~/.social-agents/logs/cron/<date>.log` (devotional) and `~/.social-agents/logs/cron/warm-<date>.log` (warming).
 
 ## In-flight work (next session resumes here)
 
-1. **Wire up cron for `/warm-all`** — three staggered slots per day (e.g. `:17 09 * * *`, `:43 13 * * *`, `:22 18 * * *`). Sample crontab is in `.claude/skills/warm-all/SKILL.md`. Validate by leaving it running for a few days and checking the run logs in `~/.social-agents/logs/warm/`.
-2. **Live-test `/pinterest-warm`, `/instagram-warm`, `/warm-all`** as full skill invocations. The component actions (scroll, like on X, save on Pinterest) have all been exercised manually 2026-05-04, but the skills themselves haven't been invoked as single slash commands.
-3. **Daily devotional fan-out**: today's `/post-daily-devotional` only posts to IG. Per the cadence agreement, it should fan out to **IG + X + Pinterest** (NOT LinkedIn — feature posts only there). Refactor: `/post-daily-devotional` should call `/instagram-post`, `/x-post`, AND `/pinterest-post` in sequence, each with platform-tailored caption + the same padded screenshot. Add this to the cron so 12pm daily fans across all three.
-4. **`/feature-post` end-to-end live-test**: skill written, every component exercised manually but never as a single invocation. Next feature ship → invoke `/feature-post` to validate.
-5. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is creating an AM2 LLC Page → linking to IG via Meta Accounts Center → enable the IG composer's cross-post toggle (no automation required). `/facebook-post` is the harder route if that toggle isn't reliably visible on web.
-6. **Bluesky**: similar architecture to X minus the graduated-access friction (~1hr to mirror `/x-login` + `/x-post`). Not started.
-7. **TikTok / YouTube Shorts**: deferred until a video pipeline exists. See `.claude/skills/tiktok-post/SKILL.md`.
+1. **Watch the cron run for a few days** — both `/post-daily-devotional` (noon) and `/warm-all` (9:17 / 13:43 / 18:22) are now installed and use `--dangerously-skip-permissions`. Check `~/.social-agents/logs/cron/*.log` and `~/.social-agents/logs/warm/*.json` to confirm each fire executes cleanly. First eligible warm-all fire from now: 18:22 today.
+2. **Live-test `/post-daily-devotional` end-to-end** as a single skill call (today's invocation was manual step-by-step on May 4). The refactored skill drafts captions for all 3 platforms by reading the screenshot directly. Risk: caption auto-generation may produce something off-brand on day 1; review the first cron-fired run's outputs and tune the templates if needed.
+3. **`/feature-post` end-to-end live-test**: skill written, every component exercised manually but never as a single invocation. Next feature ship → invoke `/feature-post` to validate.
+4. **Facebook (AM2 LLC Page)**: not yet built. Easiest first step is creating an AM2 LLC Page → linking to IG via Meta Accounts Center → enable the IG composer's cross-post toggle (no automation required). `/facebook-post` is the harder route if that toggle isn't reliably visible on web.
+5. **Bluesky**: similar architecture to X minus the graduated-access friction (~1hr to mirror `/x-login` + `/x-post`). Not started.
+6. **TikTok / YouTube Shorts**: deferred until a video pipeline exists. See `.claude/skills/tiktok-post/SKILL.md`.
 
 ## Known issues / gotchas
 

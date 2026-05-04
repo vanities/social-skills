@@ -1,63 +1,157 @@
 ---
 name: post-daily-devotional
-description: Take a screenshot of the iOS simulator's daily devotional and post it to Instagram. Use when the user says "post the devotional", "publish today's devotional", or runs /post-daily-devotional.
+description: Capture the iOS simulator's daily devotional, draft platform-tailored captions, and fan out to Instagram (swiftbible) + X (@swift_bible) + Pinterest (swiftbible). Skips LinkedIn (LinkedIn = feature posts only). Use when the user says "post the devotional", "publish today's devotional", or runs /post-daily-devotional. Cron-fired daily at 12:00 local.
 disable-model-invocation: true
-allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(test *) Bash(date *) Bash(ls *) Bash(cat *) Bash(mkdir *) Skill(instagram-post *)
+allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(test *) Bash(date *) Bash(ls *) Bash(cat *) Bash(mkdir *) Bash(cp *) Read(*) Write(*) Skill(instagram-post *) Skill(x-post *) Skill(pinterest-post *)
 ---
 
-# Post today's iOS-simulator devotional to Instagram
+# Post today's daily devotional to IG + X + Pinterest
 
-Account: `swiftbible` (override via `$SOCIAL_AGENTS_IG_ACCOUNT`).
-Reference: `docs/platforms/instagram.md`.
+Default account: `swiftbible` (override via `$SOCIAL_AGENTS_IG_ACCOUNT`).
+Skips LinkedIn — that channel is reserved for feature ships, not daily content.
 
-## Step 1: Verify the simulator is booted
+## Step 1: Verify simulator booted
 
 ```!
 xcrun simctl list devices | grep -q '(Booted)' && echo "ok" || echo "NO BOOTED SIMULATOR"
 ```
 
-If `NO BOOTED SIMULATOR`, abort and tell the user to boot one in Xcode first.
+Abort if not booted.
 
-## Step 2: Capture the screen
-
-```!
-SHOT="/tmp/daily-devotional-$(date +%Y-%m-%d).png"
-xcrun simctl io booted screenshot "$SHOT"
-ls -lh "$SHOT"
-```
-
-## Step 2b: Pad to 4:5 for Instagram
-
-Raw iPhone screenshots are ~9:19.5 — IG's auto-crop chops important top/bottom content. Pad to 4:5 first:
+## Step 2: Capture + pad
 
 ```!
-SHOT="/tmp/daily-devotional-$(date +%Y-%m-%d).png"
-PADDED=$(bash scripts/pad_ios_screenshot.sh "$SHOT" "/tmp/daily-devotional-$(date +%Y-%m-%d)-4x5.jpg" edge)
-ls -lh "$PADDED"
+DATE=$(date +%Y-%m-%d)
+RAW="/tmp/daily-devotional-${DATE}.png"
+PADDED="/tmp/daily-devotional-${DATE}-4x5.jpg"
+xcrun simctl io booted screenshot "$RAW"
+bash scripts/pad_ios_screenshot.sh "$RAW" "$PADDED" edge
+ls -lh "$RAW" "$PADDED"
 ```
 
-Use `$PADDED` (the 4:5 version) for the post in step 4, not `$SHOT`.
+`$RAW` is the original tall screenshot (good for Pinterest, which loves tall content). `$PADDED` is 4:5 (required for IG, used for X for consistency).
 
-## Step 3: Read the caption (optional)
+## Step 3: Read the screenshot to extract today's content
 
-```!
-test -f ~/.social-agents/daily-devotional-caption.txt && cat ~/.social-agents/daily-devotional-caption.txt || echo ""
+Use the `Read` tool on `$RAW` so you can see the page. Identify:
+
+- **Book + verse reference** (e.g. "James 2:12", "Psalm 23:1-3")
+- **Verse text** (the green-italic block)
+- **Theme** — a short phrase you'd put on a poster (e.g. "The Law of Liberty", "The Lord is my Shepherd")
+- **Brief reflection** (1-2 sentences from the body — usually the first paragraph after the verse)
+
+Write these to a tiny JSON for downstream use:
+
+```bash
+cat > /tmp/daily-devotional-content.json <<JSON
+{
+  "date": "${DATE}",
+  "reference": "<book + verse>",
+  "theme": "<short theme phrase>",
+  "verse_text": "<verse text in quotes>",
+  "reflection": "<1-2 sentence summary>"
+}
+JSON
 ```
 
-## Step 4: Post via the instagram-post skill
+## Step 4: Draft platform-tailored captions
 
-Invoke `/instagram-post` with:
+### Instagram (long, descriptive)
 
-- account = `${SOCIAL_AGENTS_IG_ACCOUNT:-swiftbible}`
-- media = `/tmp/daily-devotional-$(date +%Y-%m-%d)-4x5.jpg` (the padded version from step 2b)
-- caption = output of step 3 (empty string if the file didn't exist)
+Honor `~/.social-agents/daily-devotional-caption.txt` if present (manual override). Otherwise auto-generate to `/tmp/dd-ig-caption.txt`:
 
-## Verification and reporting
+```
+Today's reading from the Swift Bible app — <reference>:
 
-After `/instagram-post` completes, summarize:
+"<verse text>"
 
-- Screenshot path uploaded.
-- Outcome (success / specific failure step).
-- Path of the verification screenshot from `/instagram-post`.
+<reflection — full 1-2 sentences>
 
-If `/instagram-post` reported "STATE MISSING", tell the user to run `/instagram-login ${SOCIAL_AGENTS_IG_ACCOUNT:-swiftbible}` first.
+✦ New devotional every day at noon.
+
+#DailyDevotional #Bible #ChristianApp #Faith #SwiftBible
+```
+
+### X / Twitter (≤280 chars, single tweet)
+
+Write `/tmp/dd-x-thread.json`:
+
+```json
+[{
+  "text": "Today's reading from the Swift Bible app — <reference>:\n\n\"<verse text>\"\n\n<reflection — TIGHT, ≤90 chars>\n\n#DailyDevotional #Bible",
+  "media": ["<padded screenshot path>"]
+}]
+```
+
+Hard 280-char limit; trim the reflection if needed. Verify with `jq -r '.[].text' /tmp/dd-x-thread.json | wc -c` (cap at 281 including trailing newline).
+
+### Pinterest (search-friendly title + description)
+
+Write `/tmp/dd-pinterest.json`:
+
+```json
+{
+  "media": "<RAW path — tall, no padding>",
+  "title": "<reference> — <theme> | Daily Bible Devotional",
+  "description": "Today's devotional from the Swift Bible app. \"<verse text>\" (<reference>) <reflection>. New devotional every day at noon. ✦",
+  "board": "Daily Devotionals",
+  "link": "https://am2.biz/swiftbible"
+}
+```
+
+Title ≤100 chars. Description ≤500 chars.
+
+## Step 5: Fan out
+
+Sequentially invoke each platform skill. **Continue on failure** — log the error and move to the next platform. The full devotional shouldn't be blocked by a single platform issue.
+
+```bash
+# 1. Instagram (long-running first because it's the most reliable)
+/instagram-post swiftbible "$PADDED" "$(cat /tmp/dd-ig-caption.txt)"
+IG_OUTCOME=$?
+
+# 2. X
+/x-post /tmp/dd-x-thread.json
+X_OUTCOME=$?
+
+# 3. Pinterest
+/pinterest-post /tmp/dd-pinterest.json
+P_OUTCOME=$?
+```
+
+In practice, invoke each via the Skill tool so the agent can read each skill's run log.
+
+## Step 6: Roll-up run log
+
+Write `~/.social-agents/logs/daily-devotional-fanout-<date>.json`:
+
+```json
+{
+  "date": "...",
+  "screenshot_raw": "...",
+  "screenshot_padded": "...",
+  "content_extracted": { ... },
+  "instagram": { "outcome": "...", "run_log": "..." },
+  "x":         { "outcome": "...", "run_log": "..." },
+  "pinterest": { "outcome": "...", "run_log": "..." }
+}
+```
+
+## Step 7: Report
+
+Per-platform outcome with permalinks if available. If any platform reported a STATE MISSING / login-required error, tell the user to run the relevant `/<platform>-login` skill.
+
+## Cron
+
+```cron
+0 12 * * * /bin/bash /Users/vanities/git/work/me/social-agents/scripts/daily_devotional.sh
+```
+
+The `daily_devotional.sh` wrapper just `cd`s into the repo and runs `claude --print "/post-daily-devotional"`. Logs go to `~/.social-agents/logs/cron/<date>.log`.
+
+## Failure modes
+
+- **Simulator not booted**: skill aborts at step 1; cron run fails clean.
+- **One platform fails, others should still post**: the skill explicitly continues on failure; partial success is better than no post.
+- **Caption file missing for IG override**: fall back to auto-generated caption (no error).
+- **X graduated-access modal after first post**: harmless; `/x-post` already handles dismissal.
