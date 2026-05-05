@@ -12,7 +12,7 @@ exec >> "$LOG_FILE" 2>&1
 echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) warm cron start ==="
 
 # macOS cron has a stripped PATH; restore the usual locations.
-export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+export PATH="$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 
 cd "$(dirname "$0")/.."
 # --dangerously-skip-permissions: cron can't prompt; the skill is read-only
