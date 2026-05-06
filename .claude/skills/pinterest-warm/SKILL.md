@@ -62,9 +62,15 @@ echo "Planned actions: ${PICKS[*]}"
 ## Step 4: Switch to Pinterest tab, ensure home feed
 
 ```bash
-agent-browser tab list 2>&1 | head -10
-# Switch into the pinterest.com tab. If none: tab new https://www.pinterest.com/.
-agent-browser open https://www.pinterest.com/
+# Find the Pinterest tab via curl-only — NEVER `agent-browser tab list`.
+# agent-browser auto-spawns a fresh Chrome on CDP attach failure even when
+# HTTP is healthy. See feedback_no_agent_browser_in_cron_guard.md.
+TAB_INDEX=$(bash scripts/find_platform_tab.sh "pinterest.com" 2>/dev/null || true)
+if [ -n "$TAB_INDEX" ]; then
+  agent-browser tab "$TAB_INDEX"
+else
+  agent-browser tab new "https://www.pinterest.com/"
+fi
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```

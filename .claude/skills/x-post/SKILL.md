@@ -57,12 +57,18 @@ Abort if any check fails.
 
 ## Step 2: Find or open the X tab
 
-```!
-agent-browser tab list 2>&1
+```bash
+# Find the X tab via curl-only — NEVER `agent-browser tab list`.
+# See feedback_no_agent_browser_in_cron_guard.md for the why.
+TAB_INDEX=$(bash scripts/find_platform_tab.sh "x.com" 2>/dev/null || \
+            bash scripts/find_platform_tab.sh "twitter.com" 2>/dev/null || true)
+if [ -n "$TAB_INDEX" ]; then
+  agent-browser tab "$TAB_INDEX"
+else
+  agent-browser tab new "https://x.com/home"
+fi
+agent-browser wait --load networkidle
 ```
-
-- If a tab matches `x.com` or `twitter.com`, switch into it (`agent-browser tab <index>`).
-- Else `agent-browser tab new https://x.com/home`.
 
 ```!
 agent-browser get url

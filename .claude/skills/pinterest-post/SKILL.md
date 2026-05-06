@@ -40,12 +40,17 @@ Abort if any check fails. (`wc -c` includes trailing newline → effective max i
 
 ## Step 2: Find or open the Pinterest tab
 
-```!
-agent-browser tab list 2>&1
+```bash
+# Find the Pinterest tab via curl-only — NEVER `agent-browser tab list`.
+# See feedback_no_agent_browser_in_cron_guard.md for the why.
+TAB_INDEX=$(bash scripts/find_platform_tab.sh "pinterest.com" 2>/dev/null || true)
+if [ -n "$TAB_INDEX" ]; then
+  agent-browser tab "$TAB_INDEX"
+else
+  agent-browser tab new "https://www.pinterest.com/"
+fi
+agent-browser wait --load networkidle
 ```
-
-- If a tab matches `pinterest.com`, switch into it.
-- Else: `agent-browser tab new https://www.pinterest.com/`.
 
 If `agent-browser get url` returns a login URL, abort and tell the user to run `/pinterest-login`.
 

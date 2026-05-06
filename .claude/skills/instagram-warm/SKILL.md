@@ -31,9 +31,16 @@ PICKS=$(printf "scroll\n"; printf "like\n%.0s" $(seq 1 "$ENG_COUNT"))
 ## Step 4: Switch to IG tab, ensure home feed
 
 ```bash
-agent-browser tab list 2>&1 | head -10
-# Switch into the instagram.com tab. If none: tab new https://www.instagram.com/.
-agent-browser open https://www.instagram.com/
+# Find the IG tab via curl-only — NEVER `agent-browser tab list`. agent-browser
+# auto-spawns a fresh Chrome on CDP attach failure even when HTTP is healthy,
+# killing the user's session. See feedback_no_agent_browser_in_cron_guard.md.
+# Hit this 3× across 2026-05-05 → 2026-05-06 before this pattern was adopted.
+TAB_INDEX=$(bash scripts/find_platform_tab.sh "instagram.com" 2>/dev/null || true)
+if [ -n "$TAB_INDEX" ]; then
+  agent-browser tab "$TAB_INDEX"
+else
+  agent-browser tab new "https://www.instagram.com/"
+fi
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```

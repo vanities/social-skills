@@ -91,10 +91,15 @@ echo "Planned actions: ${PLANNED[*]}"
 ## Step 4: Switch to X tab, ensure home
 
 ```bash
-agent-browser tab list 2>&1 | head -10
-# Find the x.com tab index, switch into it. If none: tab new https://x.com/home.
-# Then:
-agent-browser open https://x.com/home   # safe even on existing tab; refreshes feed
+# Find the X tab via curl-only — NEVER `agent-browser tab list`.
+# agent-browser auto-spawns a fresh Chrome on CDP attach failure even when
+# HTTP is healthy. See feedback_no_agent_browser_in_cron_guard.md.
+TAB_INDEX=$(bash scripts/find_platform_tab.sh "x.com" 2>/dev/null || true)
+if [ -n "$TAB_INDEX" ]; then
+  agent-browser tab "$TAB_INDEX"
+else
+  agent-browser tab new "https://x.com/home"
+fi
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```
