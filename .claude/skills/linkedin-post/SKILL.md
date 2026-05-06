@@ -92,14 +92,14 @@ Click the **Add media** button. A media editor opens with an "Upload from comput
 
 ```bash
 agent-browser snapshot -i 2>&1 | grep -E '"Upload from computer".*ref'
-agent-browser upload "@<UPLOAD_BUTTON_REF>" "$1"          # single image
+agent-browser upload "@<UPLOAD_BUTTON_REF>" "$1"          # single image OR video
 # or for a multi-image carousel:
 agent-browser upload "@<UPLOAD_BUTTON_REF>" path1.jpg path2.jpg path3.jpg
 ```
 
-`agent-browser upload @<ref>` correctly resolves the click target across iframes even when querySelector via the top doc does not.
+`agent-browser upload @<ref>` correctly resolves the click target across iframes even when querySelector via the top doc does not. The same code path handles video — LinkedIn's media editor accepts `.mp4` (and re-encodes if needed). For an iPhone screen recording, prefer `scripts/pad_ios_video.sh` first to land at 1080×1920 h264 (smaller upload, no HEVC re-transcode).
 
-Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 1500 3000)`), then click **Next** in the media editor to return to the compose modal with the image(s) attached.
+Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 1500 3000)`), then click **Next** in the media editor to return to the compose modal with the image(s) attached. For videos, the editor renders a `region "Video player"` with a Play button + a "Video title" / "Captions" / "Video thumbnail" toolbar — Next is still the same button.
 
 ## Step 8: Post
 

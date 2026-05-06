@@ -19,12 +19,14 @@ Same gates: active hours, min gap, daily budget for IG (default `min: 3, max: 6`
 
 ## Step 3: Plan actions
 
-IG action space: `scroll`, `like`. Default weights `6/3` (scroll-heavy). Plan 1–2 actions per run.
+IG action space: `scroll`, `like`. Each warm pass = **1 scroll up front (always), then 2–3 likes** (the only engagement action available). 2026-05-05 user feedback: warm passes should land 2–3 engagement actions per fire, not 0–1.
 
 ```bash
-RUN_COUNT=$(( (RANDOM % 2) + 1 ))
-PICKS=$(printf "scroll\n%.0s" $(seq 1 6); printf "like\n%.0s" $(seq 1 3) | shuf -n "$RUN_COUNT")
+ENG_COUNT=$(( (RANDOM % 2) + 2 ))   # 2 or 3
+PICKS=$(printf "scroll\n"; printf "like\n%.0s" $(seq 1 "$ENG_COUNT"))
 ```
+
+(IG only exposes `like` as a non-comment, non-follow engagement; the "weighted bag" of one action degenerates to N likes. Cap is `max_per_run: 3`, so 2–3 fits.)
 
 ## Step 4: Switch to IG tab, ensure home feed
 

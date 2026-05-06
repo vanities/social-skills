@@ -145,12 +145,22 @@ agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 
 **The button labeled `Publish`** (top-right, red) is the publish action. Its ref shifts each render — re-snapshot. **Do NOT click `Create new Pin`** — that button starts a fresh draft and saves the current form as a *draft* (Pinterest auto-saves every form change to drafts; the sidebar shows `Pin drafts (N)`).
 
+**Critical**: by the time you reach this step, the form has typically grown past one viewport and the Publish button (top-right of the form) is **scrolled off-screen** at a negative y. A click on a button at `y < 0` silently no-ops (or saves a draft) — you'll see "Pin drafts" increment instead of a published toast. Always scroll it into view before clicking.
+
 ```bash
 agent-browser snapshot -i 2>&1 | grep -E 'Publish.*ref' | head -1
+# Sanity check the bbox — if y is negative, scroll into view
+agent-browser eval "(()=>{const btns=document.querySelectorAll('button');const pub=Array.from(btns).find(b=>(b.textContent||'').trim()==='Publish'&&!b.disabled);const r=pub.getBoundingClientRect();return{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),disabled:pub.disabled}})()"
+
+agent-browser scrollintoview "@<PUBLISH_REF>"
+agent-browser wait $(bash scripts/jitter.sh 700 1300)
+
 agent-browser wait $(bash scripts/jitter.sh 1500 3500)
 agent-browser click "@<PUBLISH_REF>"
 agent-browser wait 8000   # publish takes 5–8s; the button text flips to "Publishing" mid-flight
 ```
+
+After click, look for **"Your Pin has been published!"** in the next snapshot. If instead you see `Pin drafts (N+1)` (incremented) and the form still shown, the click no-op'd — re-scroll, re-snapshot, re-click.
 
 After publish: the form clears, `Pin drafts (N)` decrements by one, and the new pin appears at `https://www.pinterest.com/<handle>/<board>/`. Verify by navigating to the board and confirming the pin count went up.
 

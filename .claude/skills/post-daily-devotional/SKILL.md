@@ -25,7 +25,13 @@ DATE=$(date +%Y-%m-%d)
 RAW="/tmp/daily-devotional-${DATE}.png"
 PADDED="/tmp/daily-devotional-${DATE}-4x5.jpg"
 xcrun simctl io booted screenshot "$RAW"
-bash scripts/pad_ios_screenshot.sh "$RAW" "$PADDED" edge
+# `surprise` rolls a Bible-themed flair (sparkles, golden crosses, scripture words,
+# nebula orbs, hearts, etc.) into the 4:5 padding. Picks one of:
+#   gradient | bloom | sparkle | cosmic | divine | holy | lovely | dream
+# stderr line "[pad] surprise → <mode>" tells you which one ran.
+# Override with a specific mode (or `edge` for a clean seamless pad) if you want
+# something subdued for a particular day.
+bash scripts/pad_ios_screenshot.sh "$RAW" "$PADDED" surprise
 ls -lh "$RAW" "$PADDED"
 ```
 

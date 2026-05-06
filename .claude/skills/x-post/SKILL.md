@@ -17,12 +17,16 @@ Thread file: `$1` — JSON array of tweet objects.
 [
   {"text": "Tweet 1 text. ≤280 chars.", "media": ["/abs/path/to/img.jpg"]},
   {"text": "Tweet 2 text.",              "media": ["/abs/path/to/img2.jpg"]},
-  {"text": "Tweet 3 text. No media."}
+  {"text": "Tweet 3 text. No media."},
+  {"text": "Tweet 4 with a video.",      "media": ["/abs/path/clip.mp4"]}
 ]
 ```
 
-- `text` is required. Must be ≤280 chars per tweet.
-- `media` is optional. 1–4 image paths per tweet (X's hard cap). Use absolute paths.
+- `text` is required. Must be ≤280 chars per tweet (URLs auto-shorten to 23 chars via t.co — count those as 23, not their literal length).
+- `media` is optional. Per tweet, EITHER 1–4 image paths OR exactly 1 video. Use absolute paths.
+  - Image formats: jpg, png, webp, gif (X's `input[type=file]` accepts `image/jpeg,image/png,image/webp,image/gif`).
+  - Video formats: mp4, mov (`video/mp4,video/quicktime`). Hard cap: 2:20 / 512 MB. Pre-encode to h264 + AAC + faststart for clean ingest (HEVC sometimes triggers a re-transcode on X's side).
+  - **Don't mix images and video in the same tweet** — X allows one or the other.
 - A single-tweet post is just an array with one element.
 
 ## CRITICAL: thread strategy — reply chain, NOT multi-tweet modal
@@ -78,21 +82,36 @@ The compose modal opens with one **"Post text"** textbox. **Refs shift on every 
 
 ```bash
 TEXT0=$(jq -r '.[0].text' "$1")
-MEDIA0=$(jq -r '.[0].media // [] | .[]' "$1")    # space-separated when multiple
+MEDIA0=$(jq -r '.[0].media // [] | .[]' "$1")    # newline-separated when multiple
 agent-browser click "@<TEXTBOX>"
 agent-browser wait $(bash scripts/jitter.sh 300 700)
-agent-browser type "@<TEXTBOX>" "$TEXT0"
+agent-browser focus "@<TEXTBOX>"
+agent-browser keyboard type "$TEXT0"             # NOT `type @ref` — X uses Lexical contenteditable; `type` swallows newlines into a run-on
 agent-browser wait $(bash scripts/jitter.sh 600 1300)
 ```
 
-If `MEDIA0` is non-empty, upload all paths in one call (the **first** input supports `multiple=true`, so up to 4 paths in a single tweet works fine):
+If `MEDIA0` is non-empty, upload (the **first** input supports `multiple=true` for up to 4 images in a single tweet, OR exactly 1 video):
 
 ```bash
 agent-browser upload "input[type=file]" $MEDIA0
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```
 
-**Re-snapshot immediately before clicking Post** — refs shift after upload AND after the click on a stale Post button silently does nothing. The freshest ref is the one to click.
+**For video uploads, wait for processing to complete before clicking Post.** X's compose modal exposes upload status via `[data-testid=attachments]` ("Processing 50%" → "Uploaded (100%)"); the Post button stays disabled until processing finishes. Poll:
+
+```bash
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  agent-browser wait 3000
+  STATE=$(agent-browser eval "(()=>{const a=document.querySelector('[data-testid=attachments]');return a?a.textContent.slice(0,200):'no attachment'})()" 2>&1 | tail -1)
+  echo "[$i] $STATE"
+  if echo "$STATE" | grep -qE 'Uploaded \(100%\)' && ! echo "$STATE" | grep -qE 'Processing'; then
+    echo "✓ video ready"
+    break
+  fi
+done
+```
+
+**Re-snapshot immediately before clicking Post** — refs shift after upload AND clicking a stale Post button silently no-ops. The freshest ref is the one to click.
 
 ```bash
 agent-browser wait $(bash scripts/jitter.sh 1500 3500)
@@ -126,12 +145,14 @@ MEDIA_I=$(jq -r ".[$i].media // [] | .[]" "$1")
 agent-browser snapshot -i 2>&1 | grep -E 'Post text|Reply.*ref' | head -5
 agent-browser click "@<REPLY_TEXTBOX>"
 agent-browser wait $(bash scripts/jitter.sh 300 700)
-agent-browser type "@<REPLY_TEXTBOX>" "$TEXT_I"
+agent-browser focus "@<REPLY_TEXTBOX>"
+agent-browser keyboard type "$TEXT_I"            # NOT `type @ref` — preserves newlines
 agent-browser wait $(bash scripts/jitter.sh 600 1300)
 
 if [ -n "$MEDIA_I" ]; then
   agent-browser upload "input[type=file]" $MEDIA_I
   agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+  # Video reply: poll [data-testid=attachments] for "Uploaded (100%)" before continuing (see Step 3).
 fi
 ```
 

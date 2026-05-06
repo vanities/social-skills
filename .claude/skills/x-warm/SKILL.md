@@ -64,26 +64,29 @@ fi
 
 ## Step 3: Plan this run's actions
 
-Sample 1–3 actions weighted by `actions.<name>.weight`, respecting `max_per_run` and remaining daily budget per action. Cap the run to `min(remaining_budget, MIN_BUDGET_THIS_RUN..MAX_BUDGET_THIS_RUN)` where the per-run target is sampled from a small range (1–3).
+Each warm pass = **1 scroll up front (always), then 2–3 weighted engagement actions** (likes/reposts). Scroll is the cheap browsing signal; engagement is what we're warming the account with. Without the dedicated engagement bag, the weighted sampler often lands on scroll in single-action runs and warming achieves nothing — the prior shape was 1–3 actions including scroll, which usually meant "1 scroll, no engagement". 2026-05-05 user feedback: "should we do like 2-3?" — yes.
 
 ```bash
-# Per-run target action count (typically 1-3)
-RUN_COUNT=$(( (RANDOM % 3) + 1 ))
+# Always 1 scroll, then 2-3 engagement actions
+ENG_COUNT=$(( (RANDOM % 2) + 2 ))   # 2 or 3
+RUN_COUNT=$(( ENG_COUNT + 1 ))
 REMAINING=$((MAX_BUDGET - DONE_TOTAL))
-[ "$RUN_COUNT" -gt "$REMAINING" ] && RUN_COUNT=$REMAINING
+[ "$RUN_COUNT" -gt "$REMAINING" ] && RUN_COUNT=$REMAINING && ENG_COUNT=$((RUN_COUNT - 1))
 
-# Build a weighted bag of action names. Each action repeated by its weight.
+# Build a weighted bag of ENGAGEMENT actions only (no scroll).
 BAG=()
-for action in scroll like repost; do
+for action in like repost; do
   WEIGHT=$(jq -r ".platforms.x.actions.$action.weight // 0" "$CFG")
   for _ in $(seq 1 "$WEIGHT"); do BAG+=("$action"); done
 done
-PLANNED=()
-for _ in $(seq 1 "$RUN_COUNT"); do
+PLANNED=("scroll")
+for _ in $(seq 1 "$ENG_COUNT"); do
   PLANNED+=("${BAG[$((RANDOM % ${#BAG[@]}))]}")
 done
 echo "Planned actions: ${PLANNED[*]}"
 ```
+
+**Per-action caps still apply.** If `PLANNED` accumulates more `repost`s than `actions.repost.max_per_run` (default 1), drop the extras and replace with `like`. (Likes have `max_per_run: 3` so 2-3 likes per run is fine.)
 
 ## Step 4: Switch to X tab, ensure home
 
@@ -112,7 +115,17 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s). This is th
 - Re-snapshot. Find `button "<N> Likes. Like"` refs (NOT `Liked` — those are already-liked).
 - Filter out tweets authored by `@swift_bible` (the article aria-label includes the author handle).
 - Pick a random ref from the remaining set.
-- Click it. Wait jitter.
+- **Click via eval, NOT `agent-browser click @<ref>`**. 2026-05-05 live test: `agent-browser click @<ref>` returned `✓ Done` for X like buttons but the click event didn't fire — count and aria-label stayed unchanged. Eval-based DOM `.click()` worked first try on both attempted likes. Stale-ref problem: the feed re-renders frequently and X's React handler ignores synthesized clicks on stale refs.
+  ```bash
+  # Find the chosen tweet's article via the like button's text. Get a stable handle
+  # via querySelector with data-testid="like" inside the article, then click.
+  agent-browser eval "(()=>{const arts=Array.from(document.querySelectorAll('article'));const a=arts.find(x=>!(x.textContent||'').match(/@swift_bible/i)&&x.querySelector('[data-testid=\"like\"]'));if(!a)return 'no candidate';const btn=a.querySelector('[data-testid=\"like\"]');btn.click();return {author:(a.querySelector('[data-testid=\"User-Name\"] a')?.textContent||'').slice(0,40),clicked:true}})()"
+  ```
+- Verify by re-querying the same article — `data-testid` should flip from `like` to `unlike`, and the count number should increment by 1.
+  ```bash
+  agent-browser eval "(()=>{const a=document.querySelector('article [data-testid=\"unlike\"]');return a?'OK liked':'still like'})()"
+  ```
+- Wait jitter (4–18s) before next action.
 - Increment `state.x.actions_today.like` by 1. **One like = one action.** Do NOT like multiple tweets in a single planned `like` slot — re-plan for that.
 
 ### repost

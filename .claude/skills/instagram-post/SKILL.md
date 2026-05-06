@@ -22,19 +22,31 @@ test -f "$1" && echo "media ok" || echo "MEDIA MISSING at $1"
 
 If the media is missing, abort.
 
-## Step 1b: Pad tall iPhone screenshots to 4:5
+## Step 1b: Pre-pad tall iPhone media
 
-If `$1` is a tall portrait image (aspect ratio narrower than 4:5, e.g. raw iPhone simulator screenshots are ~9:19.5), Instagram will aggressively auto-crop the top and bottom. Run the padding helper first:
+Instagram aggressively crops content that doesn't match the aspect it expects (4:5 for feed photos, 9:16 for Reels). Pad before uploading.
+
+**Image (feed post → 4:5)**:
 
 ```bash
 PADDED=$(bash scripts/pad_ios_screenshot.sh "$1" "" edge)
 # Modes: edge (default, seamless) | blur (Apple-style blurred bg) | random (curated palette) | #RRGGBB (solid)
-# The script no-ops if the image is already 4:5 or wider.
+# No-ops if the image is already 4:5 or wider.
 ```
 
-Then use `$PADDED` instead of `$1` for the upload step. The original file is left untouched.
+For an aesthetic feature post, prefer `blur` — polished album-art-style frame.
 
-For an aesthetic post (e.g. feature posts where the screenshot is the hero), prefer `blur` — it produces a polished album-art-style frame.
+**Video (Reel → 9:16)**:
+
+```bash
+PADDED=$(bash scripts/pad_ios_video.sh "$1" "" blur)
+# Modes: blur (default) | black | #RRGGBB
+# Outputs 1080x1920 h264 + AAC + faststart. Re-encodes even if already 9:16 (HEVC → h264).
+```
+
+IG auto-converts vertical video uploads to Reels (web shows "Video posts are now shared as reels"). The flow below covers both image-feed-post and video-Reel paths; differences are called out per step.
+
+Use `$PADDED` instead of `$1` for the upload step. The original file is left untouched.
 
 ## Step 2: Find or open the Instagram tab
 
@@ -72,52 +84,136 @@ When the upload dialog is reachable, find the underlying `<input type=file>`:
 
 ```bash
 agent-browser eval "Array.from(document.querySelectorAll('input[type=file]')).map(e=>({accept:e.accept,multiple:e.multiple}))"
+# accept includes "image/avif,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime"
 ```
 
 The IG file input has `multiple=true` — pass multiple paths to `agent-browser upload` for a carousel post:
 
 ```bash
-agent-browser upload "input[type=file]" "$PADDED"                 # single image
-# or for a carousel (each path padded individually first):
+agent-browser upload "input[type=file]" "$PADDED"                 # single image OR video
+# or for an image carousel (each path padded individually first):
 agent-browser upload "input[type=file]" "$PADDED1" "$PADDED2"
 ```
 
-This is *not* a human-typed field, so plain upload is correct. Wait jitter after:
+Wait jitter after:
 
 ```bash
-agent-browser wait $(bash scripts/jitter.sh 800 1800)
+agent-browser wait $(bash scripts/jitter.sh 1500 3500)   # videos take longer to ingest than images
 ```
 
-## Step 6: Skip crop / edit screens
-
-Click **"Next"** through any crop, filter, or edit screens until the caption screen appears. Re-snapshot between clicks. Wait jitter between each:
+**For video uploads only**: IG shows a "Video posts are now shared as reels" notice. Snapshot, find OK, click. The post will be a Reel even though we entered via "New post" / "Create".
 
 ```bash
-agent-browser wait $(bash scripts/jitter.sh 600 1400)
+agent-browser snapshot -i 2>&1 | grep -E '(OK|Learn more about Reels).*ref' | head -3
+agent-browser click "@<OK_REF>"
+agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```
+
+## Step 6: Crop / Edit screens
+
+**`agent-browser snapshot -i` does NOT reliably surface the contents of IG's `[role=dialog]` modals (Crop, Edit, Sharing). Use `eval` to find and click buttons inside them.**
+
+Pattern for each modal — get the active dialog's label, then enumerate buttons:
+
+```bash
+agent-browser eval "(()=>{const dialogs=document.querySelectorAll('[role=dialog]');return Array.from(dialogs).map(d=>({label:d.getAttribute('aria-label'),visible:d.offsetParent!==null}))})()"
+# → [{ "label": "Crop", "visible": true }]
+
+agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=Crop]');return Array.from(d.querySelectorAll('button,[role=button]')).map(b=>(b.textContent||b.getAttribute('aria-label')||'').trim())})()"
+# → ["Back", "Next", "Select crop", "Open media gallery", ...]
+```
+
+### 6a: Crop dialog — pick the right aspect ratio
+
+The Crop dialog defaults to **Original** (which IG often interprets as 1:1 for ambiguous content). Vertical Reels need **9:16 / Mobile**, padded feed photos want **4:5**. Image gets aggressively cropped if the wrong aspect goes through; the only recovery is to back out and re-upload.
+
+**Critical**: the "Select crop" button is the only step in this whole flow that does **not** respond to JS `click()`. IG's React listens for real pointer events on this control. Programmatic `click()` will NOT open the popover. Use `agent-browser mouse move/down/up` at the button's bbox center.
+
+```bash
+# Find the Select crop button's bbox (always visible in the Crop dialog footer)
+read -r SC_X SC_Y < <(agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=Crop]');const sc=Array.from(d.querySelectorAll('button')).find(b=>b.textContent.trim()==='Select crop');const r=sc.getBoundingClientRect();return Math.round(r.x+r.width/2)+' '+Math.round(r.y+r.height/2)})()" 2>&1 | tail -1 | tr -d '"')
+echo "Select crop at ($SC_X, $SC_Y)"
+
+# Real mouse click — opens the popover
+agent-browser mouse move "$SC_X" "$SC_Y" && \
+  agent-browser wait 200 && \
+  agent-browser mouse down && \
+  agent-browser wait 100 && \
+  agent-browser mouse up
+agent-browser wait $(bash scripts/jitter.sh 600 1200)
+```
+
+After the popover renders, the aspect options DO surface in `agent-browser snapshot -i`:
+
+```bash
+agent-browser snapshot -i 2>&1 | grep -E '(Original|1:1|4:5|16:9).*ref' | head -5
+# - button "Original Photo outline icon" [ref=eXX]
+# - button "1:1 Crop square icon"        [ref=eXX]
+# - button "4:5 Crop portrait icon"      [ref=eXX]
+# - button "16:9 Crop landscape icon"    [ref=eXX]
+# (Reels flow may show a 9:16 / Mobile option in addition to or instead of 16:9.)
+
+# For a vertical Reel: click 9:16 / Mobile
+# For a 4:5 padded image: click 4:5
+agent-browser click "@<ASPECT_REF>"
+agent-browser wait $(bash scripts/jitter.sh 600 1200)
+```
+
+If the snapshot returns no aspect options, the popover didn't open — retry the real-mouse click (sometimes the first attempt times out on slow machines).
+
+### 6b: Click Next through Crop → Edit → caption screen
+
+```bash
+# Crop → Edit
+agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=Crop]');const next=Array.from(d.querySelectorAll('button,[role=button]')).find(b=>b.textContent.trim()==='Next');next.click();return 'crop next'})()"
+agent-browser wait $(bash scripts/jitter.sh 1500 2500)
+
+# Edit → caption
+agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=Edit]');const next=Array.from(d.querySelectorAll('button,[role=button]')).find(b=>b.textContent.trim()==='Next');next.click();return 'edit next'})()"
+agent-browser wait $(bash scripts/jitter.sh 2000 3500)   # video transcode handshake takes longer
+```
+
+Confirm the active dialog is now `Create new post` before continuing.
 
 ## Step 7: Enter the caption
 
-Use `type` (real keystrokes), not `fill` — captions are user-typed content and should look that way. Find the caption textarea `@ref` and:
-
-```text
-agent-browser type @<caption-ref> "$2"
-```
-
-Then:
+`agent-browser snapshot -i` *does* find the caption textbox (`textbox "Write a caption..."`) — capture its `@ref`. Focus it, then **use `agent-browser keyboard type`, NOT `agent-browser type @ref`**:
 
 ```bash
+agent-browser focus "@<caption-ref>"
+agent-browser keyboard type "$CAPTION"   # $CAPTION can contain literal \n — keyboard type sends Enter for each newline
 agent-browser wait $(bash scripts/jitter.sh 800 1600)
+```
+
+**Why `keyboard type` and not `type @ref`**: IG's caption editor is a Lexical contenteditable div. `agent-browser type @ref "multi\nline"` swallows newlines and produces one run-on paragraph. `keyboard type` sends real Enter keystrokes, which Lexical converts to proper `<br><br>` paragraph breaks AND auto-styles `#hashtags` with the correct `class="x7l2uk3 xt0e3qv"` link spans.
+
+Verify the caption was accepted:
+
+```bash
+agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Create new post\"]');const ca=d.querySelector('[aria-label=\"Write a caption...\"]');return{len:ca.textContent.length,first80:ca.textContent.slice(0,80),last60:ca.textContent.slice(-60)}})()"
 ```
 
 ## Step 8: Share
 
-Wait jitter (humans pause to re-read before posting), then click **Share**:
+The dialog's Share button isn't disambiguated in `snapshot -i` (it gets confused with feed Share buttons). Click via eval:
 
 ```bash
-agent-browser wait $(bash scripts/jitter.sh 1500 3500) && \
-agent-browser click @<share-ref> && \
-agent-browser wait 3000
+agent-browser wait $(bash scripts/jitter.sh 1500 3500)
+agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Create new post\"]');const sh=Array.from(d.querySelectorAll('button,[role=button]')).find(b=>b.textContent.trim()==='Share');sh.click();return 'clicked Share'})()"
+```
+
+Then poll the dialog label until it transitions Sharing → Post shared (videos take longer):
+
+```bash
+for i in 1 2 3 4 5 6 7 8; do
+  agent-browser wait 3000
+  STATE=$(agent-browser eval "(()=>{const d=document.querySelectorAll('[role=dialog]')[0];return d?d.getAttribute('aria-label'):'closed'})()" 2>&1 | tail -1)
+  echo "[$i] $STATE"
+  echo "$STATE" | grep -q 'Post shared' && break
+done
+
+# Dismiss the success dialog
+agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Post shared\"]');d.querySelector('[role=button]').click();return 'done'})()"
 ```
 
 ## Step 9: Verify and write the run log

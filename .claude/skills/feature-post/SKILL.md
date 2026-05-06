@@ -1,24 +1,26 @@
 ---
 name: feature-post
-description: Orchestrate a cross-platform launch post for an iOS app feature. Drives the iOS simulator to capture screenshots, pads them, drafts platform-tailored captions, gets user approval, then cross-posts to LinkedIn (AM2 LLC), Instagram (swiftbible), and X (swift_bible). Use when the user says "feature post X", "post about the new Y feature", or runs /feature-post.
+description: Orchestrate a cross-platform launch post for an iOS app feature. Drives the iOS simulator to capture screenshots / video, pads them, drafts platform-tailored captions (announcement-style for LinkedIn / IG / X; search-rewritten how-to for Pinterest), gets user approval, then cross-posts to LinkedIn (AM2 LLC), Instagram (swiftbible), X (swift_bible), and Pinterest (swiftbible). Use when the user says "feature post X", "post about the new Y feature", or runs /feature-post.
 disable-model-invocation: true
 argument-hint: [feature-description] [platforms]
-allowed-tools: Bash(*) Bash(agent-browser *) Bash(xcrun simctl *) Bash(jq *) Bash(date *) Bash(mkdir *) Bash(cp *) Bash(test *) Bash(ls *) Read(*) Write(*) Skill(linkedin-post *) Skill(instagram-post *) Skill(x-post *)
+allowed-tools: Bash(*) Bash(agent-browser *) Bash(xcrun simctl *) Bash(jq *) Bash(date *) Bash(mkdir *) Bash(cp *) Bash(test *) Bash(ls *) Read(*) Write(*) Skill(linkedin-post *) Skill(instagram-post *) Skill(x-post *) Skill(pinterest-post *)
 ---
 
 # Feature post — cross-platform launch from iOS simulator
 
 `$1`: feature description (1–2 sentences). If empty, ask the user.
-`$2`: comma-separated subset of `linkedin,instagram,x` (default: all three).
+`$2`: comma-separated subset of `linkedin,instagram,x,pinterest` (default: all four).
 
 This skill composes:
 - **XcodeBuildMCP** (tap, screenshot, snapshot_ui) — sim navigation + capture
-- `scripts/pad_ios_screenshot.sh` — pads tall screenshots to 4:5
+- `scripts/pad_ios_screenshot.sh` — pads tall screenshots to 4:5 (IG/LinkedIn/X)
+- `scripts/pad_ios_video.sh` — pads tall video to 9:16 (IG Reels / LinkedIn / X video)
 - `/linkedin-post 104970470 <media...> <caption>` — AM2 LLC company page
 - `/instagram-post swiftbible <padded-media> <caption>` — swift_bible IG
-- `/x-post <thread-json>` — @swift_bible reply chain
+- `/x-post <thread-json>` — @swift_bible reply chain or single tweet
+- `/pinterest-post <pin-json>` — swiftbible Pinterest, **search-rewritten** title + description, board defaults to `Bible Study Tools` for feature pins (different from `Daily Devotionals` which is reserved for per-day verse pins)
 
-Defaults are baked for the Swift Bible app. Override platform target args (LinkedIn company id, IG account) inline if posting for a different brand.
+Defaults are baked for the Swift Bible app. Override platform target args (LinkedIn company id, IG account, Pinterest board) inline if posting for a different brand.
 
 ## Step 1: Confirm the feature description
 
@@ -80,9 +82,42 @@ Use `edge` (seamless) by default. Suggest `blur` mode if the post is hero/aesthe
 - T1 (hook, ≤280 chars, 1 image): "Shipped … today — <feature one-liner>"
 - T2 (detail, ≤280 chars, 1 image): the user-facing experience
 - T3 (closing, ≤280 chars, no media): the reflection + hashtags
-- Or a single tweet if the feature is simple
+- Or a single tweet if the feature is simple (e.g. one screen recording tells the whole story)
 
 Write the X thread to `/tmp/x-thread-${SLUG}.json` in the `[{text, media?}, ...]` format `/x-post` expects.
+
+**Pinterest (`swiftbible`) — SEARCH-REWRITTEN, not announcement-style**:
+
+Pinterest is a search engine, not a feed. "We just shipped X" content does NOT surface — search-friendly how-to / explainer content does. **Reframe the same feature as something a user would search for**, then write a title + description rich in keywords.
+
+Examples of the rewrite:
+| Announcement (LinkedIn/X/IG) | Pinterest search-rewrite |
+|---|---|
+| "Just shipped: Apple Intelligence Explain feature in Swift Bible" | "How to chat with Bible verses using AI on iPhone" |
+| "New History view: 9 eras / 29 articles of Church history" | "Christian Church History Timeline — Free iPhone App" |
+| "Redesigned More tab in Swift Bible" | "Best Bible App Features for iPhone Bible Study" |
+
+Write `/tmp/pinterest-${SLUG}.json`:
+
+```json
+{
+  "media":       "<TALL RAW screenshot path — NOT the 4:5 padded version; or pad_ios_video.sh output if it's a video feature>",
+  "title":       "<search-rewritten title — under 100 chars — front-load keywords>",
+  "description": "<3–5 sentences front-loaded with searchable phrases the user would actually google. End with the destination link mention. Up to 500 chars.>",
+  "board":       "Bible Study Tools",
+  "link":        "https://apps.apple.com/us/app/bible-kjv-swiftbible/id6670373108"
+}
+```
+
+**Board strategy**:
+- `Bible Study Tools` is the default for feature pins — broad keyword board users actually search.
+- `Daily Devotionals` is reserved for the daily-devotional cron output — don't mix.
+- Create the board inline if it doesn't exist (the `/pinterest-post` skill handles board creation).
+
+**Media for Pinterest**:
+- For an image-based feature: use the **tall RAW iPhone screenshot** (Pinterest's algorithm prefers vertical 2:3 / taller; padding to 4:5 hurts reach).
+- For a video feature: use the **`pad_ios_video.sh` output** (1080×1920 9:16) — same as IG/LinkedIn/X.
+- Pinterest indexes alt-text-style descriptions, so the description should literally say what's in the image (e.g. "iPhone screen showing the Swift Bible app's verse explainer with on-device AI chat").
 
 ## Step 5: Show drafts and get approval
 
@@ -94,13 +129,14 @@ Wait for explicit approval before any posting.
 
 ## Step 6: Cross-post
 
-Default order: LinkedIn → Instagram → X. (LinkedIn first because the AM2 LLC posts are the primary "company news" channel; X last because the reply chain is more clicks.)
+Default order: **LinkedIn → Instagram → X → Pinterest**. (LinkedIn first because the AM2 LLC posts are the primary "company news" channel; X last among the announcement platforms because the reply chain is more clicks; Pinterest at the end because it's a separate audience and a separate content rewrite — it doesn't share the announcement caption with the others.)
 
 For each enabled platform in `$2`:
 
 - **LinkedIn**: `/linkedin-post 104970470 <padded-screenshot-1> [<padded-screenshot-2> ...] "<caption>"` — pass multiple media paths for a carousel.
 - **Instagram**: `/instagram-post swiftbible <padded-screenshot-1> [<padded-screenshot-2> ...] "<caption>"` — same multi-file convention.
 - **X**: `/x-post /tmp/x-thread-${SLUG}.json` — `/x-post` posts T0 standalone then replies through T1, T2, ...
+- **Pinterest**: `/pinterest-post /tmp/pinterest-${SLUG}.json` — single pin in `Bible Study Tools` board with search-rewritten content.
 
 Wait for each skill's run log before starting the next. If one fails, ask before continuing — the user may want to fix and re-run that platform only.
 
@@ -108,10 +144,10 @@ Wait for each skill's run log before starting the next. If one fails, ask before
 
 Summarize per platform:
 - Outcome (success / failed at step N)
-- Live URL (LinkedIn post URL if available, Instagram permalink, X status URLs)
+- Live URL (LinkedIn post URL if available, Instagram permalink, X status URLs, Pinterest pin URL)
 - Run log path
 - Verification screenshot
 
-Recommend any follow-ups: cross-post review, X graduated-access engagement (likes/follows from `@swift_bible` to push the account toward graduating out of soft-restriction).
+Recommend any follow-ups: cross-post review, X graduated-access engagement (likes/follows from `@swift_bible` to push the account toward graduating out of soft-restriction), Pinterest re-pin yourself from a different board if the pin would fit two themes.
 
 **Do not close any browser tab.**

@@ -14,8 +14,16 @@
 
 set -euo pipefail
 
+# Resolution order for both vars: shell env → .env file → hardcoded default.
+# Single-var greps (never `source`) so passwords with $ in .env stay literal.
+ENV_FILE="$(dirname "$0")/../.env"
+if [[ -f "$ENV_FILE" ]]; then
+  : "${SOCIAL_AGENTS_CHROME_PROFILE:=$(grep -m1 '^SOCIAL_AGENTS_CHROME_PROFILE=' "$ENV_FILE" | cut -d= -f2-)}"
+  : "${SOCIAL_AGENTS_CHROME_BINARY:=$(grep -m1 '^SOCIAL_AGENTS_CHROME_BINARY=' "$ENV_FILE" | cut -d= -f2-)}"
+fi
 PROFILE="${SOCIAL_AGENTS_CHROME_PROFILE:-$HOME/.social-agents/chrome-profile}"
 CHROME_BIN="${SOCIAL_AGENTS_CHROME_BINARY:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+PROFILE="${PROFILE/#\~/$HOME}"
 
 mkdir -p "$PROFILE"
 

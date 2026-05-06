@@ -114,7 +114,7 @@ Both wrappers invoke `claude --print --dangerously-skip-permissions "/<skill>"` 
 |---|---|
 | `scripts/launch_browser.sh` | Boots the persistent shared Chrome against `~/.social-agents/chrome-profile/` with the anti-detection flag. |
 | `scripts/jitter.sh MIN MAX` | Random delay generator — used between every browser action. |
-| `scripts/pad_ios_screenshot.sh <input> [output] [mode]` | Pads tall iPhone screenshots to 4:5. Modes: `edge` (seamless sample), `blur` (Apple-style blurred frame), `random` (curated palette), `#RRGGBB`. |
+| `scripts/pad_ios_screenshot.sh <input> [output] [mode]` | Pads tall iPhone screenshots to 4:5. Plain modes: `edge` (seamless sample), `blur` (Apple-style frame), `random` (palette), `#RRGGBB` (solid). Fancy modes (random gradient bg + SVG decoration layer — sparkles, stars, hearts, golden crosses, mini-Bibles, doves, scripture words, glow orbs): `gradient`, `bloom`, `sparkle`, `cosmic`, `divine`, `holy`, `lovely`, `dream`. Smart: `surprise` picks a fancy mode at random. |
 | `scripts/daily_devotional.sh` · `scripts/warm_all_cron.sh` | Cron entrypoints — `cd` into the repo, restore `PATH`, run Claude headless. |
 
 ## Logs

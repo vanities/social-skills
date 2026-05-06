@@ -25,10 +25,22 @@
       "actions": {
         "scroll":  {"weight": 5, "items_to_view": {"min": 8, "max": 20}},
         "save":    {"weight": 4, "max_per_run": 4, "default_board": "Daily Devotionals"},
-        "follow":  {"weight": 1, "max_per_run": 1}
+        "react":   {"weight": 3, "max_per_run": 3, "_note": "Pinterest's heart/reaction button on the pin detail page — the closest analog to an IG/X 'like'."},
+        "follow":  {"weight": 1, "max_per_run": 1},
+        "comment": {
+          "_note": "Added 2026-05-05. Comment is OUTSIDE the 2-3 engagement bag — it has a separate planning rule: always 1 per pass + 50% chance of a 2nd. With ~1 Pinterest pick per day across the cron schedule, that averages 1-2 comments/day. Each comment pulls a phrase from config/comment-corpus.json and types it via scripts/type_human.sh (per-char with variable delays — uniform-speed typing is a bot signal even when the text is fine).",
+          "always_one": true,
+          "second_probability_pct": 50,
+          "max_per_run": 2,
+          "corpus_path": "config/comment-corpus.json",
+          "history_path": "~/.social-agents/state/comment-history.json",
+          "phrase_repeat_cooldown_days": 7,
+          "author_repeat_cooldown_days": 30,
+          "typer_script": "scripts/type_human.sh"
+        }
       },
-      "_skipped_actions": ["comment"],
-      "_skipped_reason": "Pinterest is more lenient than X/IG; follow is fine here. Comments still skipped.",
+      "_skipped_actions": [],
+      "_skipped_reason": "All four engagement actions enabled (save/react/follow/comment). Pinterest is more lenient than X/IG — comments enabled here first as the test platform. Defer comments on X (~2 weeks of clean Pinterest first), IG (last; may stay deferred indefinitely).",
       "feed_url": "https://www.pinterest.com/"
     },
     "instagram": {
