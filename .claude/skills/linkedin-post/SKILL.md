@@ -81,10 +81,19 @@ agent-browser wait $(bash scripts/jitter.sh 800 1600)
 
 If the caption contains a URL (e.g. `github.com/...`, a blog post, etc.), LinkedIn often auto-fetches an Open Graph link card and **occupies the single media slot with it**. You'll see `Edit media preview` + `Remove media` buttons in the compose modal even though you haven't uploaded anything. To attach your own screenshot, click **Remove media** first to free the slot — the URL stays clickable in the caption text.
 
+**Critical (set 2026-05-07)**: `agent-browser click "@<REMOVE_MEDIA_REF>"` silently no-ops on this button — sometimes 4+ attempts return `✓ Done` but the link card stays attached. LinkedIn's React handler ignores synthesized clicks here, same pattern as IG's Select crop button. **Use a real mouse event** (`mouse move/down/up` at the button's bbox center):
+
 ```bash
-agent-browser snapshot -i 2>&1 | grep -E '(Remove media|Edit media preview).*ref'
-agent-browser click "@<REMOVE_MEDIA_REF>"
+# Get the Remove media button's bbox center
+read -r MX MY < <(agent-browser eval "(()=>{const b=Array.from(document.querySelectorAll('button')).find(b=>(b.getAttribute('aria-label')||b.textContent||'').trim()==='Remove media');const r=b.getBoundingClientRect();return Math.round(r.x+r.width/2)+' '+Math.round(r.y+r.height/2)})()" 2>&1 | tail -1 | tr -d '"')
+# Real mouse click — opens nothing fancy, just removes the link card
+agent-browser mouse move "$MX" "$MY" && \
+  agent-browser wait 200 && \
+  agent-browser mouse down && \
+  agent-browser wait 100 && \
+  agent-browser mouse up
 agent-browser wait $(bash scripts/jitter.sh 700 1500)
+# Verify by re-snapshot — "Remove media" should be gone, "Add media" should be present
 ```
 
 ### 7b: Click Add media + upload
