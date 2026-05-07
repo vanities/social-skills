@@ -62,15 +62,10 @@ echo "Planned actions: ${PICKS[*]}"
 ## Step 4: Switch to Pinterest tab, ensure home feed
 
 ```bash
-# Find the Pinterest tab via curl-only — NEVER `agent-browser tab list`.
-# agent-browser auto-spawns a fresh Chrome on CDP attach failure even when
-# HTTP is healthy. See feedback_no_agent_browser_in_cron_guard.md.
-TAB_INDEX=$(bash scripts/find_platform_tab.sh "pinterest.com" 2>/dev/null || true)
-if [ -n "$TAB_INDEX" ]; then
-  agent-browser tab "$TAB_INDEX"
-else
-  agent-browser tab new "https://www.pinterest.com/"
-fi
+# Switch to the Pinterest tab via curl-based discovery (NEVER `agent-browser
+# tab list` — auto-spawn risk). Helper does find + switch + URL-verify +
+# tab-new fallback in one step. See feedback_no_agent_browser_in_cron_guard.md.
+bash scripts/switch_to_platform_tab.sh "pinterest.com" "https://www.pinterest.com/"
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```
@@ -86,73 +81,92 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s).
 
 ### save (THE main Pinterest engagement signal)
 
-The home feed shows pins as `button "Pin card"` elements with refs `@e14`, `@e15`, …. Save buttons are NOT in the DOM until you hover or click into the pin detail. The reliable flow is **click pin → save from detail page → navigate back**.
+The home feed shows pins as `button "Pin card"` elements. Save buttons are NOT in the DOM until you click into the pin detail. The reliable flow is **pick a pin URL via DOM scan → navigate → save from detail → navigate back**.
+
+**Topic filter (mandatory, set 2026-05-06)**: NEVER save a random pin. Pinterest's home feed mixes commerce / lifestyle / off-brand content. Pick a pin whose visible title/description matches the brand voice (Christian content for swiftbible). Pre-fetch each candidate's metadata via `/json/list`-style scraping is overkill — instead, navigate to a candidate, check title/heading text against the keyword regex, save if match, otherwise back to feed and try a different pin. Try at most 5 candidates before skipping the save action.
 
 ```bash
-# 1. Find pin URLs directly via DOM (snapshot @e refs for Pin cards DO NOT click reliably —
-#    Pinterest renders pin cards as React buttons that don't respond to synthesized clicks).
-PIN_PATH=$(agent-browser eval "Array.from(document.querySelectorAll('a[href*=\"/pin/\"]')).slice(0,12).map(a=>a.href.match(/\\/pin\\/[0-9]+/)?.[0]).filter(Boolean)" \
-  | tail -20 | grep '/pin/' | tr -d '"', | shuf -n 1 | tr -d ' ')
+# 1. Pull candidate pin URLs from the home feed
+CANDIDATES=$(agent-browser eval "Array.from(document.querySelectorAll('a[href*=\"/pin/\"]')).slice(0,12).map(a=>a.href.match(/\\/pin\\/[0-9]+/)?.[0]).filter(Boolean)" 2>&1 | tail -20 | grep '/pin/' | tr -d '"', | sort -u)
 
-# 2. Navigate directly to the pin
-agent-browser open "https://www.pinterest.com${PIN_PATH}/"
-agent-browser wait --load networkidle
-agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+CHOSEN_PIN=""
+for cand in $(echo "$CANDIDATES" | shuf | head -5); do
+  agent-browser open "https://www.pinterest.com${cand}/"
+  agent-browser wait --load networkidle
+  agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+  # Brand filter: check pin title + description for religious keywords
+  ON_BRAND=$(agent-browser eval "(()=>{const re=/\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;return re.test(document.body.innerText||'')?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
+  if [ "$ON_BRAND" = "yes" ]; then
+    CHOSEN_PIN="$cand"
+    break
+  fi
+  echo "skipping $cand (not Bible-themed)"
+done
 
-# 3. Find Save button on detail page (typically @e34) — re-snapshot
-agent-browser snapshot -i 2>&1 | grep -E '"Save".*\[ref=' | head -3
-agent-browser click "@<SAVE_REF>"
-agent-browser wait $(bash scripts/jitter.sh 2000 5000)
-# A "Pin Saved" toast and an "Undo Saved Pin" button confirm the save.
+if [ -z "$CHOSEN_PIN" ]; then
+  echo "no Bible-themed pin in 5 candidates; skipping save action"
+  # fall through to next planned action
+else
+  # 2. Find Save button on detail page (typically @e34) — re-snapshot
+  agent-browser snapshot -i 2>&1 | grep -E '"Save".*\[ref=' | head -3
+  agent-browser click "@<SAVE_REF>"
+  agent-browser wait $(bash scripts/jitter.sh 2000 5000)
+  # A "Pin Saved" toast and an "Undo Saved Pin" button confirm the save.
 
-# 4. Optionally pick a specific board: click "Select a board to save to: <X>" (@e33),
-#    pick from the dropdown that opens, THEN click Save.
-#    For warming, accepting the default (usually "Profile") is fine.
+  # 3. Optionally pick a specific board: click "Select a board to save to: <X>" (@e33),
+  #    pick from the dropdown that opens, THEN click Save.
+  #    For warming, accepting the default (usually "Profile") is fine.
 
-# 5. Navigate back to feed for next action
-agent-browser open https://www.pinterest.com/
-agent-browser wait --load networkidle
-agent-browser wait $(bash scripts/jitter.sh 1000 2000)
+  # 4. Navigate back to feed for next action
+  agent-browser open https://www.pinterest.com/
+  agent-browser wait --load networkidle
+  agent-browser wait $(bash scripts/jitter.sh 1000 2000)
+fi
 ```
 
-Increment `state.pinterest.actions_today.save` by 1.
+Increment `state.pinterest.actions_today.save` by 1 only on a successful save (skip increment if the action was filtered out).
 
 ### react (the heart / love reaction — Pinterest's closest analog to a "like")
 
-Pinterest exposes a heart-shaped reaction button on the pin detail page. Tapping it gives a positive engagement signal (similar to an IG/X like) without the friction of saving (no board picker). Reach a pin detail page the same way as `save` — pick a pin URL from the home feed, navigate.
+Pinterest exposes a heart-shaped reaction button on the pin detail page. Tapping it gives a positive engagement signal (similar to an IG/X like) without the friction of saving (no board picker). **Topic filter applies** — same brand-relevance rule as `save`. Reach a pin detail page, verify Bible content, react.
+
+**First-discovery 2026-05-06**: Pinterest's React button is a **single-tap toggle**, NOT a popover. `aria-pressed` flips `false → true` on first click — no reaction picker opens. Skip the post-click picker step that earlier versions of this skill described.
 
 ```bash
-# 1. Same as save Step 1+2: pick a pin URL and navigate to its detail page
-PIN_PATH=$(agent-browser eval "Array.from(document.querySelectorAll('a[href*=\"/pin/\"]')).slice(0,12).map(a=>a.href.match(/\\/pin\\/[0-9]+/)?.[0]).filter(Boolean)" \
-  | tail -20 | grep '/pin/' | tr -d '"', | shuf -n 1 | tr -d ' ')
-agent-browser open "https://www.pinterest.com${PIN_PATH}/"
-agent-browser wait --load networkidle
-agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+# 1. Pick + navigate + brand-filter (same loop as save)
+CANDIDATES=$(agent-browser eval "Array.from(document.querySelectorAll('a[href*=\"/pin/\"]')).slice(0,12).map(a=>a.href.match(/\\/pin\\/[0-9]+/)?.[0]).filter(Boolean)" 2>&1 | tail -20 | grep '/pin/' | tr -d '"', | sort -u)
 
-# 2. Find the heart/react button. Snapshot first to discover its ref.
-#    Pinterest labels this control with aria-labels like "React to Pin",
-#    "Add reaction", or just a heart icon — search defensively.
-agent-browser snapshot -i 2>&1 | grep -iE '(react|heart|love).*ref' | head -5
+CHOSEN_PIN=""
+for cand in $(echo "$CANDIDATES" | shuf | head -5); do
+  agent-browser open "https://www.pinterest.com${cand}/"
+  agent-browser wait --load networkidle
+  agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+  ON_BRAND=$(agent-browser eval "(()=>{const re=/\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;return re.test(document.body.innerText||'')?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
+  if [ "$ON_BRAND" = "yes" ]; then
+    CHOSEN_PIN="$cand"
+    break
+  fi
+done
 
-# 3. Click the react button (refs vary; usually the first match is the heart icon).
-agent-browser click "@<REACT_REF>"
-agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+if [ -z "$CHOSEN_PIN" ]; then
+  echo "no Bible-themed pin in 5 candidates; skipping react action"
+else
+  # 2. Find the heart/react button. Snapshot first to discover its ref.
+  #    Pinterest labels this control with aria-labels like "React to Pin",
+  #    "Add reaction", or just a heart icon — search defensively.
+  agent-browser snapshot -i 2>&1 | grep -iE '(react|heart|love).*ref' | head -5
 
-# 4. If a reaction picker pops up (love / thanks / idea / wow / haha / good idea),
-#    pick one — "love" / heart is the safest default. Otherwise the click itself
-#    has already toggled the heart.
-agent-browser snapshot -i 2>&1 | grep -iE '(love|thanks|idea|wow|haha|good idea).*ref' | head -3
-# If the picker rendered: pick one
-agent-browser click "@<LOVE_REF>"
-agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+  # 3. Click the react button (single-tap toggle — no picker opens).
+  agent-browser click "@<REACT_REF>"
+  agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 
-# 5. Verify by re-snapshot — the button's aria-label / class should flip
-#    (e.g. "React" → "Reacted" or the icon fills in red).
+  # 4. Verify aria-pressed flipped from 'false' → 'true' on the button.
 
-# 6. Navigate back to the feed for the next action
-agent-browser open https://www.pinterest.com/
-agent-browser wait --load networkidle
-agent-browser wait $(bash scripts/jitter.sh 1000 2000)
+  # 5. Navigate back to the feed for the next action
+  agent-browser open https://www.pinterest.com/
+  agent-browser wait --load networkidle
+  agent-browser wait $(bash scripts/jitter.sh 1000 2000)
+fi
 ```
 
 Increment `state.pinterest.actions_today.react` by 1.

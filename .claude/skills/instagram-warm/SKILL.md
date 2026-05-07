@@ -31,16 +31,13 @@ PICKS=$(printf "scroll\n"; printf "like\n%.0s" $(seq 1 "$ENG_COUNT"))
 ## Step 4: Switch to IG tab, ensure home feed
 
 ```bash
-# Find the IG tab via curl-only — NEVER `agent-browser tab list`. agent-browser
-# auto-spawns a fresh Chrome on CDP attach failure even when HTTP is healthy,
-# killing the user's session. See feedback_no_agent_browser_in_cron_guard.md.
-# Hit this 3× across 2026-05-05 → 2026-05-06 before this pattern was adopted.
-TAB_INDEX=$(bash scripts/find_platform_tab.sh "instagram.com" 2>/dev/null || true)
-if [ -n "$TAB_INDEX" ]; then
-  agent-browser tab "$TAB_INDEX"
-else
-  agent-browser tab new "https://www.instagram.com/"
-fi
+# Switch to the IG tab via curl-based discovery (NEVER `agent-browser tab list` —
+# it auto-spawns a fresh Chrome on CDP attach failure even when HTTP is healthy).
+# The helper finds the tab via /json/list, switches via `agent-browser tab N`,
+# verifies the URL, and falls back to `tab new` if the index was wrong.
+# /json/list array order can drift from agent-browser's tab-bar indexing
+# (caught 2026-05-06). See feedback_no_agent_browser_in_cron_guard.md.
+bash scripts/switch_to_platform_tab.sh "instagram.com" "https://www.instagram.com/"
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```
@@ -60,33 +57,58 @@ IG's home feed renders posts as a vertical stack. Each post has a Like button re
 
 **Critical**: agent-browser's snapshot @e refs for these "Like" buttons frequently fail to register a click — IG's React handler ignores synthesized clicks on elements that are off-screen. Use this pattern instead:
 
-1. Find all Like SVGs via `querySelectorAll('svg[aria-label="Like"]')`
-2. Walk up to the nearest `[role=button]` ancestor — that's the clickable
-3. Mark it with a unique id via eval
-4. **`scrollIntoView({block:'center'})` BEFORE clicking** — this is what made the live test pass after several no-ops
-5. `agent-browser click "#<id>"` — now the click triggers the React handler
-6. Verify by checking the SVG's aria-label flipped to `Unlike`
+1. Find a Bible-related Like target via `querySelectorAll('article')` + caption regex (NOT random)
+2. Skip ads (header contains "Sponsored" / "Promoted") and own posts (`@swift_bible`)
+3. Walk up to the nearest `[role=button]` ancestor — that's the clickable
+4. Mark it with a unique id via eval
+5. **`scrollIntoView({block:'center'})` BEFORE clicking** — what made the live test pass after several no-ops
+6. `agent-browser click "#<id>"` — triggers the React handler
+7. Verify by checking the SVG's aria-label flipped to `Unlike`
+
+**Topic filter (mandatory, set 2026-05-06)**: NEVER like a random feed post. The IG home feed is heavily algorithm-driven and serves ads + off-brand content. Hit 2026-05-06: random pick liked a Ford ad. User: "we don't need that. This is for Swift Bible, so it should only do Bible stuff." The eval below filters to posts whose visible text contains religious keywords AND skips Sponsored posts.
 
 ```bash
-# Step 1-3: pick a random Like target, mark it
-agent-browser eval "(()=>{const ss=Array.from(document.querySelectorAll('svg[aria-label=\"Like\"]'));const i=Math.floor(Math.random()*ss.length);let e=ss[i];while(e&&e.getAttribute('role')!=='button'&&e.parentElement)e=e.parentElement;e.id='ig-like-target';return {i,marked:e?.id}})()"
+# Step 1-4: find a Bible-relevant, non-ad Like target and mark it
+agent-browser eval "(()=>{
+  const articles = Array.from(document.querySelectorAll('article'));
+  const religiousRe = /\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;
+  const candidates = [];
+  for (const a of articles) {
+    const header = (a.querySelector('header')?.textContent || '').toLowerCase();
+    if (header.includes('sponsored') || header.includes('promoted')) continue;     // skip ads
+    if (header.includes('swift_bible')) continue;                                    // skip own posts
+    const likeSvg = a.querySelector('svg[aria-label=\"Like\"]');                     // already-liked are 'Unlike' — implicitly skipped
+    if (!likeSvg) continue;
+    const text = (a.textContent || '');
+    if (!religiousRe.test(text)) continue;                                           // topic filter
+    candidates.push({ svg: likeSvg, sample: text.slice(0, 100).replace(/\\s+/g, ' ').trim() });
+  }
+  if (candidates.length === 0) return { ok: false, reason: 'no Bible-content unliked posts in current viewport' };
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  let e = pick.svg;
+  while (e && e.getAttribute('role') !== 'button' && e.parentElement) e = e.parentElement;
+  e.id = 'ig-like-target';
+  return { ok: true, sample: pick.sample, candidate_count: candidates.length };
+})()"
+```
 
-# Step 4: scroll into view (REQUIRED — without this the click silently fails)
+If the eval returns `ok: false`, scroll once and retry up to 2 times. If still no candidates, **skip the like action for this run** (don't fall through to a random pick — the topic filter is mandatory). Decrement the planned action count and continue with the rest of the run.
+
+```bash
+# Step 5: scroll into view (REQUIRED — without this the click silently fails)
 agent-browser eval "document.querySelector('#ig-like-target')?.scrollIntoView({block:'center',behavior:'smooth'})"
 agent-browser wait $(bash scripts/jitter.sh 1500 2500)
 
-# Step 5: click
+# Step 6: click
 agent-browser click "#ig-like-target"
 agent-browser wait $(bash scripts/jitter.sh 4000 10000)
 
-# Step 6: verify — SVG aria-label should now read "Unlike"
+# Step 7: verify — SVG aria-label should now read "Unlike"
 agent-browser eval "document.querySelector('#ig-like-target svg')?.getAttribute('aria-label')"
 # expected output: "Unlike"
 ```
 
 Increment `state.instagram.actions_today.like` by 1 only after the verify step confirms the flip; if it still says "Like", retry once with another scroll-into-view, otherwise log skip and don't increment.
-
-To filter out own posts before selecting, find the author handle by walking up to the enclosing `<article>` and reading the post header text. For day-1 warming, the random pick is fine — odds of hitting your own post in a feed of 9+ are low.
 
 After each action, persist state immediately via `command mv -f` (macOS aliases `mv` to `mv -i`):
 

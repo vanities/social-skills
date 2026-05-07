@@ -91,15 +91,10 @@ echo "Planned actions: ${PLANNED[*]}"
 ## Step 4: Switch to X tab, ensure home
 
 ```bash
-# Find the X tab via curl-only — NEVER `agent-browser tab list`.
-# agent-browser auto-spawns a fresh Chrome on CDP attach failure even when
-# HTTP is healthy. See feedback_no_agent_browser_in_cron_guard.md.
-TAB_INDEX=$(bash scripts/find_platform_tab.sh "x.com" 2>/dev/null || true)
-if [ -n "$TAB_INDEX" ]; then
-  agent-browser tab "$TAB_INDEX"
-else
-  agent-browser tab new "https://x.com/home"
-fi
+# Switch to the X tab via curl-based discovery (NEVER `agent-browser tab list`
+# — auto-spawn risk). Helper does find + switch + URL-verify + tab-new
+# fallback in one step. See feedback_no_agent_browser_in_cron_guard.md.
+bash scripts/switch_to_platform_tab.sh "x.com" "https://x.com/home"
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 ```
@@ -117,21 +112,52 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s). This is th
 - Increment `state.x.actions_today.scroll` by 1 (one scroll PASS = 1 action, not N).
 
 ### like
-- Re-snapshot. Find `button "<N> Likes. Like"` refs (NOT `Liked` — those are already-liked).
-- Filter out tweets authored by `@swift_bible` (the article aria-label includes the author handle).
-- Pick a random ref from the remaining set.
-- **Click via eval, NOT `agent-browser click @<ref>`**. 2026-05-05 live test: `agent-browser click @<ref>` returned `✓ Done` for X like buttons but the click event didn't fire — count and aria-label stayed unchanged. Eval-based DOM `.click()` worked first try on both attempted likes. Stale-ref problem: the feed re-renders frequently and X's React handler ignores synthesized clicks on stale refs.
-  ```bash
-  # Find the chosen tweet's article via the like button's text. Get a stable handle
-  # via querySelector with data-testid="like" inside the article, then click.
-  agent-browser eval "(()=>{const arts=Array.from(document.querySelectorAll('article'));const a=arts.find(x=>!(x.textContent||'').match(/@swift_bible/i)&&x.querySelector('[data-testid=\"like\"]'));if(!a)return 'no candidate';const btn=a.querySelector('[data-testid=\"like\"]');btn.click();return {author:(a.querySelector('[data-testid=\"User-Name\"] a')?.textContent||'').slice(0,40),clicked:true}})()"
-  ```
-- Verify by re-querying the same article — `data-testid` should flip from `like` to `unlike`, and the count number should increment by 1.
-  ```bash
-  agent-browser eval "(()=>{const a=document.querySelector('article [data-testid=\"unlike\"]');return a?'OK liked':'still like'})()"
-  ```
-- Wait jitter (4–18s) before next action.
-- Increment `state.x.actions_today.like` by 1. **One like = one action.** Do NOT like multiple tweets in a single planned `like` slot — re-plan for that.
+
+**Topic filter (mandatory, set 2026-05-06)**: NEVER like a random feed tweet. The X home feed serves Promoted tweets and off-brand content. Like only tweets that:
+- Pass a Christian-content regex on the visible text
+- Are NOT Promoted (X labels promoted tweets — check for "data-testid='promotedIndicator'" or "Promoted" text in the article)
+- Are NOT authored by `@swift_bible` (own tweets)
+- Are NOT authored by handles containing `bible` (parody/impersonation risk — caught 2026-05-06: skipped `@The__Bible7`)
+
+Pick the target via querySelector + click via DOM `.click()`. **`agent-browser click @<ref>` does NOT fire** for X like buttons (stale-ref problem caught 2026-05-05; eval-based DOM `.click()` is the only reliable path).
+
+```bash
+agent-browser eval "(()=>{
+  const articles = Array.from(document.querySelectorAll('article'));
+  const religiousRe = /\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;
+  const candidates = [];
+  for (const a of articles) {
+    // Skip Promoted (ads)
+    if (a.querySelector('[data-testid=\"promotedIndicator\"]') || (a.textContent||'').includes('Promoted')) continue;
+    // Skip already-liked (data-testid is 'unlike' on liked tweets)
+    if (!a.querySelector('[data-testid=\"like\"]')) continue;
+    // Author handle
+    const handleEl = a.querySelector('[data-testid=\"User-Name\"]');
+    const handle = (handleEl?.textContent || '').match(/@([a-zA-Z0-9_]{1,15})/)?.[1] || '';
+    // Skip own + parody-risk handles
+    if (handle.toLowerCase() === 'swift_bible') continue;
+    if (handle.toLowerCase().includes('bible') && handle.toLowerCase() !== 'swift_bible') continue;
+    // Topic filter
+    const text = a.textContent || '';
+    if (!religiousRe.test(text)) continue;
+    candidates.push({ article: a, handle: '@' + handle, sample: text.slice(0, 80).replace(/\\s+/g, ' ').trim() });
+  }
+  if (candidates.length === 0) return { ok: false, reason: 'no Bible-content unliked non-Promoted tweets in current viewport' };
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  const btn = pick.article.querySelector('[data-testid=\"like\"]');
+  btn.click();
+  return { ok: true, handle: pick.handle, sample: pick.sample, candidate_count: candidates.length };
+})()"
+```
+
+If the eval returns `ok: false`, scroll once and retry up to 2 times. If still no candidates, **skip the like action for this run** — don't fall through to a random pick.
+
+Verify by re-querying — `data-testid` should flip from `like` to `unlike`:
+```bash
+agent-browser eval "(()=>{const a=document.querySelector('article [data-testid=\"unlike\"]');return a?'OK liked':'still like'})()"
+```
+
+Wait jitter (4–18s) before next action. Increment `state.x.actions_today.like` by 1 only after the verify confirms the flip.
 
 ### repost
 - Re-snapshot. Find `button "<N> reposts. Repost"` refs (the dropdown trigger).

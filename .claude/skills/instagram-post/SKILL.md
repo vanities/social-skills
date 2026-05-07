@@ -51,15 +51,10 @@ Use `$PADDED` instead of `$1` for the upload step. The original file is left unt
 ## Step 2: Find or open the Instagram tab
 
 ```bash
-# Find the IG tab via curl-only — NEVER `agent-browser tab list`. agent-browser
-# auto-spawns a fresh Chrome on CDP attach failure even when HTTP is healthy,
-# killing the user's session. See feedback_no_agent_browser_in_cron_guard.md.
-TAB_INDEX=$(bash scripts/find_platform_tab.sh "instagram.com" 2>/dev/null || true)
-if [ -n "$TAB_INDEX" ]; then
-  agent-browser tab "$TAB_INDEX"
-else
-  agent-browser tab new "https://www.instagram.com/"
-fi
+# Switch to the IG tab via curl-based discovery (NEVER `agent-browser tab list`
+# — auto-spawn risk). Helper does find + switch + URL-verify + tab-new
+# fallback in one step. See feedback_no_agent_browser_in_cron_guard.md.
+bash scripts/switch_to_platform_tab.sh "instagram.com" "https://www.instagram.com/"
 agent-browser wait --load networkidle
 ```
 - After switching/opening, run `agent-browser wait --load networkidle`.
