@@ -103,7 +103,7 @@ Use the `Write` tool to create `~/.social-skills/logs/login/pinterest-default-<t
   },
   "verification_challenge": null,
   "final_url":  "<url>",
-  "state_file": "/Users/vanities/.config/agent-browser/pinterest-default.json"
+  "state_file": "~/.config/agent-browser/pinterest-default.json"
 }
 ```
 

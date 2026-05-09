@@ -1,15 +1,49 @@
 ---
 name: pinterest-warm
-description: Run a single warming pass on Pinterest (swiftbible) — scroll the home feed, save 1-3 pins, react (heart) on 1-2, optionally follow one creator. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm pinterest", "engage on pinterest", or runs /pinterest-warm. Also called by /warm-all on a schedule.
+description: Run a single warming pass on Pinterest — scroll the home feed, save 1-3 pins, react (heart) on 1-2, optionally follow one creator. First arg is an optional brand slug (defaults to default_brand in config/brand.json). Reads cadence from config/engagement-schedule.json, brand tunables (own handle, topic regex, parody-risk handles) from config/brand.json. Use when the user says "warm pinterest", "engage on pinterest", or runs /pinterest-warm. Also called by /warm-all on a schedule.
 disable-model-invocation: true
+argument-hint: [brand-slug]
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
 
 # Pinterest warming pass — feed-level engagement
 
-Single run targeting `pinterest.com/swiftbible`. **Skip auto-comments.**
+`$0`: optional brand slug. Empty → uses `.default_brand` from `config/brand.json`.
 
-## Step 1: Read config + state
+## Configuration (tune via `config/brand.json` under `brands.<slug>.pinterest`)
+
+| Bucket | brand.json key | Purpose |
+|---|---|---|
+| **own_handle** | `brands.<slug>.pinterest.own_handle` | Your Pinterest handle for this brand. Used to skip your own pins / authors. |
+| **topic_filter_regex** | `brands.<slug>.pinterest.topic_filter_regex` | Case-insensitive regex matched against pin title/description. Saves and reacts only fire on pins that match — keeps the warming on-brand. Falls back to `brands.<slug>.x.topic_filter_regex` if the Pinterest-specific one isn't set. |
+| **exclude_handles_substring** | `brands.<slug>.pinterest.exclude_handles_substring` | Comma-separated substrings to skip in author handles (parody / impersonation risk). Empty disables. |
+
+## Step 0: Resolve brand + load config
+
+```bash
+BRAND=config/brand.json
+test -f "$BRAND" || { echo "MISSING $BRAND — copy from brand.example.json (see PERSONAL.md)"; exit 1; }
+
+SLUG="${1:-$(jq -r '.default_brand // empty' "$BRAND")}"
+[ -n "$SLUG" ] || { echo "MISSING brand slug — pass as first arg or set .default_brand in $BRAND"; exit 1; }
+
+# Raw values for shell use:
+OWN_HANDLE=$(jq -r ".brands.\"$SLUG\".pinterest.own_handle // empty" "$BRAND")
+TOPIC_RE=$(jq -r ".brands.\"$SLUG\".pinterest.topic_filter_regex // .brands.\"$SLUG\".x.topic_filter_regex // empty" "$BRAND")
+EXCLUDE_SUBS=$(jq -r ".brands.\"$SLUG\".pinterest.exclude_handles_substring // empty" "$BRAND")
+# JSON-encoded values for JS eval interpolation (jq -c emits a JSON string
+# literal that's also a valid JS string literal).
+OWN_HANDLE_JS=$(jq -c ".brands.\"$SLUG\".pinterest.own_handle // null" "$BRAND")
+TOPIC_RE_JS=$(jq -c ".brands.\"$SLUG\".pinterest.topic_filter_regex // .brands.\"$SLUG\".x.topic_filter_regex // null" "$BRAND")
+
+[ -n "$OWN_HANDLE" ] || { echo "MISSING brands.$SLUG.pinterest.own_handle in $BRAND"; exit 1; }
+[ -n "$TOPIC_RE" ]   || { echo "MISSING topic_filter_regex (pinterest or x) for brands.$SLUG in $BRAND"; exit 1; }
+echo "[pin-warm] brand=$SLUG own_handle=$OWN_HANDLE"
+```
+
+**Skip auto-comments** by default. Comments are gated by a separate strict pipeline (see "comment" section below) and only fire when explicitly enabled.
+
+## Step 1: Read engagement config + state
 
 Same shape as `/x-warm` but with `pinterest` instead of `x`:
 
@@ -83,7 +117,7 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s).
 
 The home feed shows pins as `button "Pin card"` elements. Save buttons are NOT in the DOM until you click into the pin detail. The reliable flow is **pick a pin URL via DOM scan → navigate → save from detail → navigate back**.
 
-**Topic filter (mandatory, set 2026-05-06)**: NEVER save a random pin. Pinterest's home feed mixes commerce / lifestyle / off-brand content. Pick a pin whose visible title/description matches the brand voice (Christian content for swiftbible). Pre-fetch each candidate's metadata via `/json/list`-style scraping is overkill — instead, navigate to a candidate, check title/heading text against the keyword regex, save if match, otherwise back to feed and try a different pin. Try at most 5 candidates before skipping the save action.
+**Topic filter (mandatory)**: NEVER save a random pin. Pinterest's home feed mixes commerce / lifestyle / off-brand content. Pick a pin whose visible title/description matches `topic_filter_regex` from `brand.json`. Navigate to a candidate, check `document.body.innerText` against the regex, save if match, otherwise back to feed and try a different pin. Try at most 5 candidates before skipping the save action.
 
 ```bash
 # 1. Pull candidate pin URLs from the home feed
@@ -94,17 +128,17 @@ for cand in $(echo "$CANDIDATES" | shuf | head -5); do
   agent-browser open "https://www.pinterest.com${cand}/"
   agent-browser wait --load networkidle
   agent-browser wait $(bash scripts/jitter.sh 1500 3000)
-  # Brand filter: check pin title + description for religious keywords
-  ON_BRAND=$(agent-browser eval "(()=>{const re=/\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;return re.test(document.body.innerText||'')?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
+  # Brand filter: check pin title + description against topic regex
+  ON_BRAND=$(agent-browser eval "(()=>{const re=new RegExp(${TOPIC_RE_JS},'i');return re.test(document.body.innerText||'')?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
   if [ "$ON_BRAND" = "yes" ]; then
     CHOSEN_PIN="$cand"
     break
   fi
-  echo "skipping $cand (not Bible-themed)"
+  echo "skipping $cand (off-topic)"
 done
 
 if [ -z "$CHOSEN_PIN" ]; then
-  echo "no Bible-themed pin in 5 candidates; skipping save action"
+  echo "no on-topic pin in 5 candidates; skipping save action"
   # fall through to next planned action
 else
   # 2. Find Save button on detail page (typically @e34) — re-snapshot
@@ -141,7 +175,7 @@ for cand in $(echo "$CANDIDATES" | shuf | head -5); do
   agent-browser open "https://www.pinterest.com${cand}/"
   agent-browser wait --load networkidle
   agent-browser wait $(bash scripts/jitter.sh 1500 3000)
-  ON_BRAND=$(agent-browser eval "(()=>{const re=/\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;return re.test(document.body.innerText||'')?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
+  ON_BRAND=$(agent-browser eval "(()=>{const re=new RegExp(${TOPIC_RE_JS},'i');return re.test(document.body.innerText||'')?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
   if [ "$ON_BRAND" = "yes" ]; then
     CHOSEN_PIN="$cand"
     break
@@ -149,7 +183,7 @@ for cand in $(echo "$CANDIDATES" | shuf | head -5); do
 done
 
 if [ -z "$CHOSEN_PIN" ]; then
-  echo "no Bible-themed pin in 5 candidates; skipping react action"
+  echo "no on-topic pin in 5 candidates; skipping react action"
 else
   # 2. Find the heart/react button. Snapshot first to discover its ref.
   #    Pinterest labels this control with aria-labels like "React to Pin",
@@ -234,9 +268,21 @@ fi
 # lenient enough that the 30-day author cooldown is nice-to-have, not critical).
 AUTHOR=$(agent-browser eval "(()=>{const sels=['[data-test-id=\"creator-card-name\"]','[data-test-id=\"closeup-creator-name\"]','[data-test-id=\"creator-handle\"]','a[data-test-id=\"creator-profile-name\"]'];for(const s of sels){const e=document.querySelector(s);if(e&&e.textContent.trim()){return e.textContent.trim().slice(0,40)}}return 'unknown'})()" 2>&1 | tail -1 | tr -d '"')
 
-# Skip if author handle includes 'bible' or 'swiftbible' (might be us / parody)
-if echo "$AUTHOR" | grep -qiE '(bible|swiftbible)'; then
-  echo "skipping comment — author '$AUTHOR' matches bible/swiftbible filter"
+# Skip if author handle matches our exclude_handles_substring list (parody / impersonation risk)
+if [ -n "$EXCLUDE_SUBS" ]; then
+  IFS=',' read -ra EXARR <<< "$EXCLUDE_SUBS"
+  for sub in "${EXARR[@]}"; do
+    sub_trim="$(echo "$sub" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    [ -z "$sub_trim" ] && continue
+    if echo "$AUTHOR" | grep -qiF "$sub_trim"; then
+      echo "skipping comment — author '$AUTHOR' matches exclude substring '$sub_trim'"
+      continue 2
+    fi
+  done
+fi
+# Always skip comments on our own posts
+if echo "$AUTHOR" | grep -qiF "$OWN_HANDLE"; then
+  echo "skipping comment — author '$AUTHOR' is us"
   continue
 fi
 

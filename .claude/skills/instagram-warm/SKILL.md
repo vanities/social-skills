@@ -1,17 +1,52 @@
 ---
 name: instagram-warm
-description: Run a single warming pass on Instagram (swift_bible) — scroll the home feed, like 1-3 posts. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm instagram", "engage on ig", or runs /instagram-warm. Also called by /warm-all on a schedule.
+description: Run a single warming pass on Instagram — scroll the home feed, like 1-3 posts. First arg is an optional brand slug (defaults to default_brand in config/brand.json). Reads cadence from config/engagement-schedule.json, brand tunables (own handle, topic regex) from config/brand.json. Use when the user says "warm instagram", "engage on ig", or runs /instagram-warm. Also called by /warm-all on a schedule.
 disable-model-invocation: true
+argument-hint: [brand-slug]
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
 
 # Instagram warming pass — feed-level engagement
 
-Single run targeting `instagram.com/swift_bible`. **Skip auto-comments AND auto-follows** — IG is the most aggressive about bot-detection signals among the three. Start scroll-only + like, ramp up later if engagement is healthy.
+**Skip auto-comments AND auto-follows** — IG is the most aggressive about bot-detection signals. Stay scroll-only + like; ramp up only after observing how the cadence is received over weeks.
 
-## Step 1: Read config + state
+`$0`: optional brand slug. Empty → uses `.default_brand` from `config/brand.json`.
 
-Same shape as `/x-warm` and `/pinterest-warm`, with `instagram` keys.
+## Configuration (tune via `config/brand.json` under `brands.<slug>.instagram`)
+
+| Bucket | brand.json key | Purpose |
+|---|---|---|
+| **own_handle** | `brands.<slug>.instagram.own_handle` | Your IG handle for this brand (no `@`). Used to skip your own posts in the feed. |
+| **topic_filter_regex** | `brands.<slug>.instagram.topic_filter_regex` | Optional. If present, likes only fire on posts whose visible text matches. Falls back to `brands.<slug>.x.topic_filter_regex` if the IG-specific one isn't set, since most users want one regex per brand domain. |
+
+If `brand.json` is missing or this brand has no IG config, the skill aborts with a setup hint.
+
+## Step 0: Resolve brand + load config
+
+```bash
+BRAND=config/brand.json
+test -f "$BRAND" || { echo "MISSING $BRAND — copy from brand.example.json (see PERSONAL.md)"; exit 1; }
+
+SLUG="${1:-$(jq -r '.default_brand // empty' "$BRAND")}"
+[ -n "$SLUG" ] || { echo "MISSING brand slug — pass as first arg or set .default_brand in $BRAND"; exit 1; }
+
+# Raw values for shell use:
+OWN_HANDLE=$(jq -r ".brands.\"$SLUG\".instagram.own_handle // empty" "$BRAND")
+TOPIC_RE=$(jq -r ".brands.\"$SLUG\".instagram.topic_filter_regex // .brands.\"$SLUG\".x.topic_filter_regex // empty" "$BRAND")
+# JSON-encoded values for JS eval interpolation (jq -c emits a JSON string
+# literal that's also a valid JS string literal). Falls back to x's regex
+# if instagram doesn't have its own.
+OWN_HANDLE_JS=$(jq -c ".brands.\"$SLUG\".instagram.own_handle // null" "$BRAND")
+TOPIC_RE_JS=$(jq -c ".brands.\"$SLUG\".instagram.topic_filter_regex // .brands.\"$SLUG\".x.topic_filter_regex // null" "$BRAND")
+
+[ -n "$OWN_HANDLE" ] || { echo "MISSING brands.$SLUG.instagram.own_handle in $BRAND"; exit 1; }
+[ -n "$TOPIC_RE" ]   || { echo "MISSING topic_filter_regex (instagram or x) for brands.$SLUG in $BRAND"; exit 1; }
+echo "[ig-warm] brand=$SLUG own_handle=@$OWN_HANDLE"
+```
+
+## Step 1: Read engagement config + state
+
+Same shape as `/x-warm`, with `instagram` keys in `engagement-schedule.json` and `engagement-state.json`.
 
 ## Step 2: Should-run gate
 
@@ -19,7 +54,7 @@ Same gates: active hours, min gap, daily budget for IG (default `min: 3, max: 6`
 
 ## Step 3: Plan actions
 
-IG action space: `scroll`, `like`. Each warm pass = **1 scroll up front (always), then 2–3 likes** (the only engagement action available). 2026-05-05 user feedback: warm passes should land 2–3 engagement actions per fire, not 0–1.
+IG action space: `scroll`, `like`. Each warm pass = **1 scroll up front (always), then 2–3 likes** (the only engagement action available).
 
 ```bash
 ENG_COUNT=$(( (RANDOM % 2) + 2 ))   # 2 or 3
@@ -33,10 +68,6 @@ PICKS=$(printf "scroll\n"; printf "like\n%.0s" $(seq 1 "$ENG_COUNT"))
 ```bash
 # Switch to the IG tab via curl-based discovery (NEVER `agent-browser tab list` —
 # it auto-spawns a fresh Chrome on CDP attach failure even when HTTP is healthy).
-# The helper finds the tab via /json/list, switches via `agent-browser tab N`,
-# verifies the URL, and falls back to `tab new` if the index was wrong.
-# /json/list array order can drift from agent-browser's tab-bar indexing
-# (caught 2026-05-06). See feedback_no_agent_browser_in_cron_guard.md.
 bash scripts/switch_to_platform_tab.sh "instagram.com" "https://www.instagram.com/"
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
@@ -55,35 +86,35 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s).
 
 IG's home feed renders posts as a vertical stack. Each post has a Like button rendered as an **`<svg aria-label="Like">` inside a `<div role="button">`**. The accessibility tree presents these as `button "Like"`, but the actual clickable target is the parent div, NOT the SVG itself. The aria-label flips to `Unlike` after a successful like.
 
-**Critical**: agent-browser's snapshot @e refs for these "Like" buttons frequently fail to register a click — IG's React handler ignores synthesized clicks on elements that are off-screen. Use this pattern instead:
+**Critical**: agent-browser's snapshot @e refs for these "Like" buttons frequently fail to register a click — IG's React handler ignores synthesized clicks on elements that are off-screen. Use this pattern:
 
-1. Find a Bible-related Like target via `querySelectorAll('article')` + caption regex (NOT random)
-2. Skip ads (header contains "Sponsored" / "Promoted") and own posts (`@swift_bible`)
+1. Find an on-topic Like target via `querySelectorAll('article')` + topic regex (NOT random)
+2. Skip ads (header contains "Sponsored" / "Promoted") and own posts
 3. Walk up to the nearest `[role=button]` ancestor — that's the clickable
 4. Mark it with a unique id via eval
-5. **`scrollIntoView({block:'center'})` BEFORE clicking** — what made the live test pass after several no-ops
+5. **`scrollIntoView({block:'center'})` BEFORE clicking** — required, off-screen synthetic clicks no-op
 6. `agent-browser click "#<id>"` — triggers the React handler
 7. Verify by checking the SVG's aria-label flipped to `Unlike`
 
-**Topic filter (mandatory, set 2026-05-06)**: NEVER like a random feed post. The IG home feed is heavily algorithm-driven and serves ads + off-brand content. Hit 2026-05-06: random pick liked a Ford ad. User: "we don't need that. This is for Swift Bible, so it should only do Bible stuff." The eval below filters to posts whose visible text contains religious keywords AND skips Sponsored posts.
+**Topic filter (mandatory)**: NEVER like a random feed post. The IG home feed is heavily algorithm-driven and serves ads + off-brand content. Filter to posts whose visible text matches `topic_filter_regex` (from `config/brand.json`) AND skip Sponsored posts.
 
 ```bash
-# Step 1-4: find a Bible-relevant, non-ad Like target and mark it
 agent-browser eval "(()=>{
+  const own = ${OWN_HANDLE_JS}.toLowerCase();
+  const topicRe = new RegExp(${TOPIC_RE_JS}, 'i');
   const articles = Array.from(document.querySelectorAll('article'));
-  const religiousRe = /\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;
   const candidates = [];
   for (const a of articles) {
     const header = (a.querySelector('header')?.textContent || '').toLowerCase();
     if (header.includes('sponsored') || header.includes('promoted')) continue;     // skip ads
-    if (header.includes('swift_bible')) continue;                                    // skip own posts
+    if (header.includes(own)) continue;                                              // skip own posts
     const likeSvg = a.querySelector('svg[aria-label=\"Like\"]');                     // already-liked are 'Unlike' — implicitly skipped
     if (!likeSvg) continue;
     const text = (a.textContent || '');
-    if (!religiousRe.test(text)) continue;                                           // topic filter
+    if (!topicRe.test(text)) continue;                                               // topic filter
     candidates.push({ svg: likeSvg, sample: text.slice(0, 100).replace(/\\s+/g, ' ').trim() });
   }
-  if (candidates.length === 0) return { ok: false, reason: 'no Bible-content unliked posts in current viewport' };
+  if (candidates.length === 0) return { ok: false, reason: 'no on-topic unliked posts in current viewport' };
   const pick = candidates[Math.floor(Math.random() * candidates.length)];
   let e = pick.svg;
   while (e && e.getAttribute('role') !== 'button' && e.parentElement) e = e.parentElement;
@@ -92,18 +123,18 @@ agent-browser eval "(()=>{
 })()"
 ```
 
-If the eval returns `ok: false`, scroll once and retry up to 2 times. If still no candidates, **skip the like action for this run** (don't fall through to a random pick — the topic filter is mandatory). Decrement the planned action count and continue with the rest of the run.
+If the eval returns `ok: false`, scroll once and retry up to 2 times. If still no candidates, **skip the like action for this run** — don't fall through to a random pick. Decrement the planned action count and continue.
 
 ```bash
-# Step 5: scroll into view (REQUIRED — without this the click silently fails)
+# Required: scroll into view before click — without this, the click silently no-ops
 agent-browser eval "document.querySelector('#ig-like-target')?.scrollIntoView({block:'center',behavior:'smooth'})"
 agent-browser wait $(bash scripts/jitter.sh 1500 2500)
 
-# Step 6: click
+# Click
 agent-browser click "#ig-like-target"
 agent-browser wait $(bash scripts/jitter.sh 4000 10000)
 
-# Step 7: verify — SVG aria-label should now read "Unlike"
+# Verify — SVG aria-label should now read "Unlike"
 agent-browser eval "document.querySelector('#ig-like-target svg')?.getAttribute('aria-label')"
 # expected output: "Unlike"
 ```

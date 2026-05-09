@@ -1,0 +1,57 @@
+# CLAUDE.local.md — personal addendum (sample)
+
+> Claude Code auto-loads `CLAUDE.local.md` alongside `CLAUDE.md`. This file is **gitignored** — put your private brand context, live state, and account routing notes here. Public PII-free playbook stays in `CLAUDE.md`.
+
+## Your brand at a glance
+
+- **Brand name**: <e.g. Acme Devotionals>
+- **Brand URL**: <e.g. acme.example.com>
+- **Voice**: <1-2 sentence description of caption tone>
+- **Cadence**: <e.g. one daily post at noon, two feature posts/week>
+
+## Accounts
+
+| Platform | Handle | Login mode | Notes |
+|---|---|---|---|
+| Instagram | `@your_handle` | auto via `INSTAGRAM_YOURHANDLE_USERNAME` | |
+| LinkedIn | `you@example.com` → personal feed | auto via `LINKEDIN_USERNAME` | Or company page id `<numeric>` |
+| X | `@your_handle` | auto via `TWITTER_USERNAME` | If you maintain multiple X accounts, list all of them and which content goes where |
+| Pinterest | `@your_handle` | auto via `PINTEREST_USERNAME` | Default board: `<board name>` |
+| TikTok | `@your_handle` | manual login only | |
+
+## Account routing (multi-account voices)
+
+If you post from more than one X / IG / LinkedIn identity, document which content goes to which account. Example:
+
+- `@brand_official` — product announcements, daily content, warming
+- `@your_personal` — long-form articles, builder/dev cross-posts
+
+Skills like `/x-post` take an explicit `account` arg precisely because the browser session can be on either at any moment. Document the routing here so future you (and future Claude sessions) don't post to the wrong account.
+
+## Live state (most recent)
+
+> Keep this current. Useful for picking up where you left off across Claude sessions. Each entry is "what's live" — not a full history. The committed CLAUDE.md docs the playbook; this file docs the actual state.
+
+- **Instagram** — bio, last post, link in bio
+- **X** — last tweet, follower trajectory, any standing graduated-access state
+- **Pinterest** — boards in use, link in bio
+- **LinkedIn** — last company-page post, last personal-feed post
+- **Cron** — installed entries (`crontab -l` mirror)
+
+## In-flight work
+
+> What needs your attention next. Delete entries as they finish; promote them to the decisions log if they yielded a learning.
+
+- [ ] ...
+
+## Decisions log (private)
+
+> Things you decided after live testing that aren't obvious from the committed code. Why-something-was-rejected belongs here so you don't relitigate.
+
+- YYYY-MM-DD: ...
+
+## Known issues / gotchas (private)
+
+> Brand-specific quirks. Generic platform gotchas belong in `CLAUDE.md`.
+
+- ...

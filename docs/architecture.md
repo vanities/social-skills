@@ -62,7 +62,7 @@ In normal interactive use, the persistent profile keeps cookies + storage and st
 
 ## Cron flow
 
-When `scripts/daily_devotional.sh` or `scripts/warm_all_cron.sh` fires from cron:
+When `scripts/daily_content.sh` (your installed daily-content cron) or `scripts/warm_all_cron.sh` fires from cron:
 
 1. The wrapper restores `PATH` (macOS cron strips it) and `cd`s into the repo.
 2. It invokes `claude --print --dangerously-skip-permissions "/<skill>"`. The flag is required because cron can't approve interactive permission prompts.
@@ -74,6 +74,6 @@ The Mac must be awake at fire times — cron does not wake the machine. If you r
 
 Three layers:
 
-- **Shell-level** — anything before Claude starts: `~/.social-skills/logs/cron/<date>.log` (devotional) and `cron/warm-<date>.log` (warming).
+- **Shell-level** — anything before Claude starts: `~/.social-skills/logs/cron/<date>.log` (daily content) and `cron/warm-<date>.log` (warming).
 - **Per-skill JSON** — every login / post / warm run writes `~/.social-skills/logs/<action>/<platform>-<account>-<ts>.json` with form refs discovered, dialogs handled, screenshots, and outcome. Form-field refs are the breadcrumb that makes UI changes easy to chase.
 - **Engagement state** — `~/.social-skills/state/engagement-state.json` tracks per-platform `last_run_iso` and today's action counts, used by `/warm-all` to enforce the daily action budget and the global min-gap.

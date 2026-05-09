@@ -1,6 +1,6 @@
 ---
 name: linkedin-post
-description: Post a media + caption to LinkedIn. Pass `personal` to post as the user, or a company id (e.g. `104970470` for AM2 LLC) to post AS that company page. Use when the user says "post X to linkedin" or runs /linkedin-post.
+description: Post a media + caption to LinkedIn. Pass `personal` to post to your own feed, or a numeric company id to post AS that company page (find your id in the page admin URL). Use when the user says "post X to linkedin" or runs /linkedin-post.
 disable-model-invocation: true
 argument-hint: [personal|<company-id>] [media-path] [caption]
 allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(ls *) Bash(grep *)

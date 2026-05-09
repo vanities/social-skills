@@ -1,0 +1,70 @@
+{
+  "_comment": "Sample brand-flavored comment corpus (Christian / devotional voice). Copy to config/comment-corpus.brand.json (gitignored — your own additions stay local) or merge phrases you like into config/comment-corpus.json directly. Skills read config/comment-corpus.json by default; this file shows what a curated domain-specific set looks like.",
+  "_authoring_rules": {
+    "max_words": 5,
+    "case": "lowercase only",
+    "no_emojis": true,
+    "no_terminal_punctuation": "skip periods/exclamation marks — they read formal/bot. Apostrophes inside words are fine (god's / he's).",
+    "no_links": true,
+    "no_self_promo": "never reference your own brand / app / URL in a comment",
+    "voice": "casual social-native, devotional + encouraging. Brief enough that repetition isn't immediately obvious."
+  },
+  "categories": {
+    "scripture_response": [
+      "his word stands forever",
+      "his word is life",
+      "his word never fails",
+      "his ways are higher",
+      "his promises are true",
+      "to god be glory",
+      "all glory to god",
+      "in his name",
+      "trust his timing",
+      "the lord provides",
+      "praise the lord",
+      "praise him",
+      "thank you jesus",
+      "selah",
+      "scripture hits different",
+      "the bible is alive",
+      "amen lord",
+      "amen jesus"
+    ],
+    "testimony_response": [
+      "praying for you",
+      "praying",
+      "lifting you up",
+      "god is faithful",
+      "he sees you",
+      "he hears you",
+      "trust him",
+      "lean in",
+      "sending love",
+      "praying for breakthrough",
+      "praying for healing",
+      "stay strong",
+      "keep going",
+      "you are loved",
+      "god is with you",
+      "he's working",
+      "he's not done yet"
+    ],
+    "teaching_response": [
+      "preach brother",
+      "preach sister",
+      "preach pastor",
+      "convicted",
+      "ouch",
+      "mic drop",
+      "this hit hard",
+      "this hit different",
+      "needed to hear this",
+      "truth bomb",
+      "say it",
+      "he said what he said",
+      "she said what she said",
+      "this is the truth",
+      "wisdom right here"
+    ]
+  }
+}

@@ -8,8 +8,8 @@ allowed-tools: Bash(*) Read(*) Write(*) Edit(*) Glob(*) Grep(*)
 
 # Draft an X Article (paste-ready helper)
 
-Account handle: `$0` (no `@` — e.g. `vanities`, `swift_bible`). Recorded in the run log so you remember which account this is for.
-Slug: `$1` (kebab-case — e.g. `docvault`, `swiftbible-launch`). Used for the output filename.
+Account handle: `$0` (no `@`). Recorded in the run log so you remember which account this is for.
+Slug: `$1` (kebab-case — e.g. `my-product-launch`). Used for the output filename.
 Source: `$2` (path to a repo, file, or `-` to draft from in-conversation context).
 
 Output: `articles/<slug>.md` in this repo (the directory is gitignored — see `.gitignore`).

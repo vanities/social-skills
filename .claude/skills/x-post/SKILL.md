@@ -8,7 +8,7 @@ allowed-tools: Bash(agent-browser *) Bash(bash *) Bash(test *) Bash(date *) Bash
 
 # Post to X (Twitter)
 
-Account handle: `$0` (no `@` — e.g. `swift_bible`, `vanities`). **Required** — there is no default. Caller is responsible for passing the right one (see CLAUDE.md account-routing rules).
+Account handle: `$0` (no `@`). **Required** — there is no default. Caller is responsible for passing the right one (see CLAUDE.md account-routing rules).
 Thread file: `$1` — JSON array of tweet objects.
 
 The browser may currently be signed in as a different account. This skill switches to `$0` automatically before composing — see Step 2.
@@ -69,8 +69,8 @@ agent-browser wait --load networkidle
 
 # CRITICAL: switch the X session to the requested account if it isn't already.
 # The browser may have been left on a different account between runs. Without
-# this, /post-daily-devotional cron at noon could post devotionals from @vanities
-# (or any other signed-in account). The helper is a no-op when already on target.
+# this, a noon cron could post under the wrong handle (any other signed-in
+# account). The helper is a no-op when already on target.
 bash scripts/x_switch_account.sh "$0"
 ```
 

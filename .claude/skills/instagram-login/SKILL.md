@@ -120,7 +120,7 @@ Use the `Write` tool to create `~/.social-skills/logs/login/instagram-$0-<timest
     { "ref": "@<ref>", "label": "<button label>", "context": "<page url or descriptor>" }
   ],
   "final_url":  "<url>",
-  "state_file": "/Users/vanities/.config/agent-browser/instagram-$0.json"
+  "state_file": "~/.config/agent-browser/instagram-$0.json"
 }
 ```
 

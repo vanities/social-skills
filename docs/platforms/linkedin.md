@@ -31,15 +31,16 @@ LinkedIn is gentler about automation than IG, but a new device fingerprint will 
 
 From `/feed/`, find the **Start a post** button → opens a modal with a text editor, Add media, audience switcher, and Post button.
 
-## Posting (company page, e.g. AM2 LLC)
+## Posting (company page)
 
-1. Find the company id once (kept here for reference): **AM2 LLC = `104970470`**.
-2. Navigate to `https://www.linkedin.com/company/<id>/admin/`. The dashboard shows the company name as a level-1 heading.
-3. Click the sidebar **+ Create** button → menu opens with: Start a post, Create an event, Share that you're hiring, Publish an article, Add a product, Create an Ad, Add services, Create a showcase page.
-4. Click **Start a post** → compose modal opens with the audience switcher reading **"AM2 LLC … Post to Anyone"** (this is how you confirm you're posting AS the page).
-5. Type caption with real keystrokes + jitter. Click **Add media** to attach a screenshot. Click **Post** when ready (button is disabled until there's content).
+Set `org.linkedin_company_id` in `config/brand.json` to the numeric id of your company page. To find it: visit `linkedin.com/company/<your-page-slug>/admin/` while signed in — LinkedIn redirects to the numeric form `linkedin.com/company/<id>/admin/`, that's your id.
 
-⚠️ The "AM2 LLC" link in the left sidebar of `/feed/` is wrapped — the bare `agent-browser click @<ref>` may not navigate. Reliable path: `agent-browser eval "..."` to read the `href` of an `a[href*="/company/"]` element, then `agent-browser open <that-url>`. Or just memo the company id (above).
+1. Navigate to `https://www.linkedin.com/company/<id>/admin/`. The dashboard shows the company name as a level-1 heading.
+2. Click the sidebar **+ Create** button → menu opens with: Start a post, Create an event, Share that you're hiring, Publish an article, Add a product, Create an Ad, Add services, Create a showcase page.
+3. Click **Start a post** → compose modal opens with the audience switcher reading **"<Company Name> … Post to Anyone"** (this is how you confirm you're posting AS the page, not as your personal profile).
+4. Type caption with real keystrokes + jitter. Click **Add media** to attach a screenshot. Click **Post** when ready (button is disabled until there's content).
+
+⚠️ The company link in the left sidebar of `/feed/` is wrapped — the bare `agent-browser click @<ref>` may not navigate. Reliable path: `agent-browser eval "..."` to read the `href` of an `a[href*="/company/"]` element, then `agent-browser open <that-url>`. Or just go straight to the admin URL via the id from `brand.json`.
 
 ## Human-like timing
 

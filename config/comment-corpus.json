@@ -1,29 +1,28 @@
 {
-  "_comment": "Comment corpus for warming. Used by warm skills when planning a 'comment' action against another user's post. Skills read this; the user edits it.",
+  "_comment": "Comment corpus for warming. Used by warm skills when planning a 'comment' action against another user's post. Skills read this; you edit it. The committed default carries only universal phrases that work across most domains. For brand-specific phrase sets (faith / dev / lifestyle / etc.) see personal.example/comment-corpus.brand.json.",
   "_authoring_rules": {
     "max_words": 5,
     "case": "lowercase only",
     "no_emojis": true,
-    "no_terminal_punctuation": "skip periods/exclamation marks — they read formal/bot. Apostrophes inside words are fine (god's / he's).",
+    "no_terminal_punctuation": "skip periods/exclamation marks — they read formal/bot. Apostrophes inside words are fine (don't / he's).",
     "no_links": true,
-    "no_self_promo": "never reference Swift Bible, the app, or am2.biz in a comment",
-    "voice": "casual social-native, devotional + encouraging. Brief enough that repetition isn't immediately obvious."
+    "no_self_promo": "never reference your own brand / app / URL in a comment — that's spam, gets you flagged",
+    "voice": "casual social-native, brief enough that repetition isn't immediately obvious"
   },
   "_usage": {
-    "selection": "Skills sample one phrase per planned comment action. Default category is 'universal'. Future: detect target-post theme (verse / testimony / teaching / praise) and pick from the matching category.",
+    "selection": "Skills sample one phrase per planned comment action. Default category is 'universal'. Future: detect target-post theme and pick from the matching category.",
     "anti_pattern_safeguards": [
       "Do NOT use the same phrase twice within 7 days against the same platform.",
       "Do NOT comment on the same author within 30 days.",
       "Do NOT comment + like + save on the same post in one pass — pick at most ONE engagement per target post.",
-      "Skip any candidate post whose author handle includes 'bible' or 'swiftbible' (might be us or a parody).",
-      "Skip any target whose visible text matches a reply-prompt pattern: /reply with/i, /comment .{1,15} below/i, /type [\"']?[A-Za-z]{2,12}[\"']?/i, /say .{1,20} below/i. These posts expect a specific keyword (often 'amen' or a verse reference) and a generic corpus phrase will look obviously off. Set 2026-05-05 after our first X test landed 'blessed' on a tweet whose image said 'reply with amen' — the user had to delete the reply manually.",
+      "Skip any candidate whose author handle matches your brand's exclude_handles_substring list (set in config/brand.json).",
+      "Skip any target whose visible text matches a reply-prompt pattern: /reply with/i, /comment .{1,15} below/i, /type [\"']?[A-Za-z]{2,12}[\"']?/i, /say .{1,20} below/i. These posts expect a specific keyword and a generic corpus phrase will look obviously off.",
       "Lean on captions/alt-text for image-based prompts when available — a fully-image-driven prompt won't surface in tweetText. If alt-text isn't accessible, prefer to skip rather than guess."
     ],
     "track_used": "When a comment is posted, append the phrase + platform + target post id + timestamp to ~/.social-skills/state/comment-history.json so the de-dup checks above can run."
   },
   "categories": {
     "universal": [
-      "amen",
       "love this",
       "love",
       "beautiful",
@@ -32,77 +31,13 @@
       "yes",
       "wow",
       "powerful",
-      "powerful word",
       "facts",
       "truth",
       "needed this",
       "needed this today",
-      "blessed",
       "this is everything",
-      "speak it",
       "say it again",
-      "say it louder",
-      "preach",
-      "yes lord",
-      "yes amen",
-      "amen amen",
-      "amen and amen"
-    ],
-    "scripture_response": [
-      "his word stands forever",
-      "his word is life",
-      "his word never fails",
-      "his ways are higher",
-      "his promises are true",
-      "to god be glory",
-      "all glory to god",
-      "in his name",
-      "trust his timing",
-      "the lord provides",
-      "praise the lord",
-      "praise him",
-      "thank you jesus",
-      "selah",
-      "scripture hits different",
-      "the bible is alive",
-      "amen lord",
-      "amen jesus"
-    ],
-    "testimony_response": [
-      "praying for you",
-      "praying",
-      "lifting you up",
-      "god is faithful",
-      "he sees you",
-      "he hears you",
-      "trust him",
-      "lean in",
-      "sending love",
-      "praying for breakthrough",
-      "praying for healing",
-      "stay strong",
-      "keep going",
-      "you are loved",
-      "god is with you",
-      "he's working",
-      "he's not done yet"
-    ],
-    "teaching_response": [
-      "preach brother",
-      "preach sister",
-      "preach pastor",
-      "convicted",
-      "ouch",
-      "mic drop",
-      "this hit hard",
-      "this hit different",
-      "needed to hear this",
-      "truth bomb",
-      "say it",
-      "he said what he said",
-      "she said what she said",
-      "this is the truth",
-      "wisdom right here"
+      "say it louder"
     ]
   }
 }

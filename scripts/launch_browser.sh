@@ -50,5 +50,5 @@ echo
 echo "Next:"
 echo "  - Install uBlock Origin from chrome web store (one-time, persists)."
 echo "  - If IG isn't already signed in:"
-echo "      agent-browser state load ~/.config/agent-browser/instagram-swiftbible.json"
+echo "      agent-browser state load ~/.config/agent-browser/instagram-<your-account>.json"
 echo "      agent-browser open https://www.instagram.com/"

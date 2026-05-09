@@ -1,15 +1,59 @@
 ---
 name: x-warm
-description: Run a single warming pass on X (@swift_bible) — scroll the home feed, like 1-3 tweets, optionally repost one. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm x", "engage on x", or runs /x-warm. Also called by /warm-all on a schedule.
+description: Run a single warming pass on X — scroll the home feed, like 1-3 tweets, optionally repost one. First arg is an optional brand slug (defaults to default_brand in config/brand.json). Reads cadence from config/engagement-schedule.json, brand tunables (own handle, topic regex, parody-risk handles) from config/brand.json, and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm x", "engage on x", or runs /x-warm. Also called by /warm-all on a schedule.
 disable-model-invocation: true
+argument-hint: [brand-slug]
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
 
 # X warming pass — feed-level engagement
 
-Single run targeting `@swift_bible`. **Skip auto-comments** — they're the highest-risk bot-detection signal on X.
+**Skip auto-comments** — they're the highest-risk bot-detection signal on X. This skill does scroll + like + repost only.
 
-## Step 1: Read config + state
+`$0`: optional brand slug. If empty, uses `.default_brand` from `config/brand.json`. Use this when you maintain multiple X accounts under separate brands — `/x-warm myproject` warms `brands.myproject` settings instead of the default.
+
+## Configuration (tune via `config/brand.json` under `brands.<slug>.x`)
+
+| Bucket | brand.json key | Purpose |
+|---|---|---|
+| **own_handle** | `brands.<slug>.x.own_handle` | Your X handle for this brand (no `@`). Used to skip your own tweets in the feed AND to switch the X session before warming (multi-account safe). |
+| **topic_filter_regex** | `brands.<slug>.x.topic_filter_regex` | Case-insensitive regex matched against each tweet's visible text. Likes only fire on tweets that match — keeps the warming on-brand. Tune to your content domain (faith, productivity, design, indie-dev, …). |
+| **exclude_handles_substring** | `brands.<slug>.x.exclude_handles_substring` | Comma-separated list of substrings; any tweet whose author handle includes one of these is skipped. Use for parody / impersonation risk. Empty string disables the filter. |
+
+If `brand.json` is missing or the resolved brand has no `x` config, the skill aborts with a setup hint — see `config/brand.example.json` and `PERSONAL.md`.
+
+## Step 0: Resolve brand + load config
+
+```bash
+BRAND=config/brand.json
+test -f "$BRAND" || { echo "MISSING $BRAND — copy from brand.example.json (see PERSONAL.md)"; exit 1; }
+
+# Resolve which brand this run targets: $0 if given, else default_brand from config.
+SLUG="${1:-$(jq -r '.default_brand // empty' "$BRAND")}"
+[ -n "$SLUG" ] || { echo "MISSING brand slug — pass as first arg or set .default_brand in $BRAND"; exit 1; }
+
+# Pull this brand's X config.
+# Raw values for shell use:
+OWN_HANDLE=$(jq -r ".brands.\"$SLUG\".x.own_handle // empty" "$BRAND")
+TOPIC_RE=$(jq -r ".brands.\"$SLUG\".x.topic_filter_regex // empty" "$BRAND")
+# JSON-encoded values for direct interpolation into JS eval (jq -c emits a
+# JSON string literal that is ALSO a valid JS string literal — no extra
+# encoding needed). Using `jq -Rn --arg re ... tojson` instead would add an
+# extra layer of quoting and break the regex.
+OWN_HANDLE_JS=$(jq -c ".brands.\"$SLUG\".x.own_handle // null" "$BRAND")
+TOPIC_RE_JS=$(jq -c ".brands.\"$SLUG\".x.topic_filter_regex // null" "$BRAND")
+EXCLUDE_SUBS_JS=$(jq -c ".brands.\"$SLUG\".x.exclude_handles_substring // \"\"" "$BRAND")
+
+[ -n "$OWN_HANDLE" ] || { echo "MISSING brands.$SLUG.x.own_handle in $BRAND"; exit 1; }
+[ -n "$TOPIC_RE" ]   || { echo "MISSING brands.$SLUG.x.topic_filter_regex in $BRAND"; exit 1; }
+echo "[x-warm] brand=$SLUG own_handle=@$OWN_HANDLE"
+
+# If you maintain multiple X accounts in the same shared Chrome, switch to the
+# right one before warming. The helper is a no-op when already on target.
+test -x scripts/x_switch_account.sh && bash scripts/x_switch_account.sh "$OWN_HANDLE" || true
+```
+
+## Step 1: Read engagement config + state
 
 ```bash
 CFG=config/engagement-schedule.json
@@ -64,7 +108,7 @@ fi
 
 ## Step 3: Plan this run's actions
 
-Each warm pass = **1 scroll up front (always), then 2–3 weighted engagement actions** (likes/reposts). Scroll is the cheap browsing signal; engagement is what we're warming the account with. Without the dedicated engagement bag, the weighted sampler often lands on scroll in single-action runs and warming achieves nothing — the prior shape was 1–3 actions including scroll, which usually meant "1 scroll, no engagement". 2026-05-05 user feedback: "should we do like 2-3?" — yes.
+Each warm pass = **1 scroll up front (always), then 2–3 weighted engagement actions** (likes/reposts). Scroll is the cheap browsing signal; engagement is what we're warming the account with. Without the dedicated engagement bag, the weighted sampler often lands on scroll in single-action runs and warming achieves nothing.
 
 ```bash
 # Always 1 scroll, then 2-3 engagement actions
@@ -93,7 +137,7 @@ echo "Planned actions: ${PLANNED[*]}"
 ```bash
 # Switch to the X tab via curl-based discovery (NEVER `agent-browser tab list`
 # — auto-spawn risk). Helper does find + switch + URL-verify + tab-new
-# fallback in one step. See feedback_no_agent_browser_in_cron_guard.md.
+# fallback in one step.
 bash scripts/switch_to_platform_tab.sh "x.com" "https://x.com/home"
 agent-browser wait --load networkidle
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
@@ -113,18 +157,23 @@ Between every action, wait `jitter.between_actions_in_run` (4–18s). This is th
 
 ### like
 
-**Topic filter (mandatory, set 2026-05-06)**: NEVER like a random feed tweet. The X home feed serves Promoted tweets and off-brand content. Like only tweets that:
-- Pass a Christian-content regex on the visible text
-- Are NOT Promoted (X labels promoted tweets — check for "data-testid='promotedIndicator'" or "Promoted" text in the article)
-- Are NOT authored by `@swift_bible` (own tweets)
-- Are NOT authored by handles containing `bible` (parody/impersonation risk — caught 2026-05-06: skipped `@The__Bible7`)
+**Topic filter (mandatory)**: NEVER like a random feed tweet. The X home feed serves Promoted tweets and off-brand content. Like only tweets that:
+- Pass `topic_filter_regex` on the visible text (from `config/brand.json`)
+- Are NOT Promoted (X labels promoted tweets — check for `data-testid='promotedIndicator'` or "Promoted" text in the article)
+- Are NOT authored by `$OWN_HANDLE` (own tweets)
+- Are NOT authored by handles matching one of `exclude_handles_substring` (parody / impersonation risk)
 
-Pick the target via querySelector + click via DOM `.click()`. **`agent-browser click @<ref>` does NOT fire** for X like buttons (stale-ref problem caught 2026-05-05; eval-based DOM `.click()` is the only reliable path).
+Pick the target via querySelector + click via DOM `.click()`. **`agent-browser click @<ref>` does NOT fire** for X like buttons; eval-based DOM `.click()` is the only reliable path.
 
 ```bash
+# Pass the brand-config values into the eval. Each ${...}_JS variable is a
+# pre-encoded JSON string (via jq -c) — interpolating it as a bare token
+# yields a valid JS string literal. Don't wrap them in extra quotes.
 agent-browser eval "(()=>{
+  const own = ${OWN_HANDLE_JS}.toLowerCase();
+  const topicRe = new RegExp(${TOPIC_RE_JS}, 'i');
+  const excludeSubs = ${EXCLUDE_SUBS_JS}.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   const articles = Array.from(document.querySelectorAll('article'));
-  const religiousRe = /\\b(bible|jesus|christ|god|gospel|scripture|verse|psalm|prayer|faith|amen|lord|holy|blessed|salvation|cross|kingdom|grace|saved|worship|devotion)\\b/i;
   const candidates = [];
   for (const a of articles) {
     // Skip Promoted (ads)
@@ -134,15 +183,16 @@ agent-browser eval "(()=>{
     // Author handle
     const handleEl = a.querySelector('[data-testid=\"User-Name\"]');
     const handle = (handleEl?.textContent || '').match(/@([a-zA-Z0-9_]{1,15})/)?.[1] || '';
-    // Skip own + parody-risk handles
-    if (handle.toLowerCase() === 'swift_bible') continue;
-    if (handle.toLowerCase().includes('bible') && handle.toLowerCase() !== 'swift_bible') continue;
+    // Skip own
+    if (handle.toLowerCase() === own) continue;
+    // Skip parody / impersonation risk
+    if (excludeSubs.some(s => handle.toLowerCase().includes(s))) continue;
     // Topic filter
     const text = a.textContent || '';
-    if (!religiousRe.test(text)) continue;
+    if (!topicRe.test(text)) continue;
     candidates.push({ article: a, handle: '@' + handle, sample: text.slice(0, 80).replace(/\\s+/g, ' ').trim() });
   }
-  if (candidates.length === 0) return { ok: false, reason: 'no Bible-content unliked non-Promoted tweets in current viewport' };
+  if (candidates.length === 0) return { ok: false, reason: 'no on-topic unliked non-Promoted tweets in current viewport' };
   const pick = candidates[Math.floor(Math.random() * candidates.length)];
   const btn = pick.article.querySelector('[data-testid=\"like\"]');
   btn.click();
@@ -161,7 +211,7 @@ Wait jitter (4–18s) before next action. Increment `state.x.actions_today.like`
 
 ### repost
 - Re-snapshot. Find `button "<N> reposts. Repost"` refs (the dropdown trigger).
-- Filter out own tweets.
+- Filter out own tweets (handle equals `$OWN_HANDLE`).
 - Click the chosen ref. A menu opens with "Repost" / "Quote".
 - Click the **"Repost"** menu item (NOT Quote).
 - Wait jitter.
@@ -193,12 +243,12 @@ After all actions, write `~/.social-skills/logs/warm/x-default-<timestamp>.json`
   "ts_end":   "...",
   "platform": "x",
   "account":  "default",
-  "x_handle": "@swift_bible",
+  "x_handle": "@${OWN_HANDLE}",
   "outcome":  "success | partial | failed",
   "planned_actions":  ["scroll", "like"],
   "executed_actions": [
     {"type": "scroll", "items_viewed": 8, "duration_s": 32},
-    {"type": "like",   "tweet_author": "@JoyceMeyer", "tweet_id": "..."}
+    {"type": "like",   "tweet_author": "@example", "tweet_id": "..."}
   ],
   "actions_today_after": {"scroll": 1, "like": 1, "repost": 0},
   "skipped_reason": null

@@ -18,7 +18,7 @@ allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash
   "title":       "Pin title (≤100 chars)",
   "description": "Pin description (≤500 chars). Hashtags work but Pinterest weights search keywords > hashtags — write naturally with relevant terms.",
   "board":       "Board name (must exist or will be created inline)",
-  "link":        "https://am2.biz/swiftbible"
+  "link":        "https://example.com"
 }
 ```
 

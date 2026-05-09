@@ -43,12 +43,12 @@ fi
 # Probe Chrome's tab list via plain HTTP. NEVER use agent-browser for any guard
 # step — agent-browser's `tab list` auto-spawns a fresh Chrome when its CDP
 # WebSocket can't connect, which kills the user's session. Plain HTTP to
-# /json/list is read-only and can't trigger any spawn. 2026-05-06 noon devotional
-# tripped this exact hazard: HTTP /json/version succeeded (Chrome was healthy
-# enough to respond to HTTP) but agent-browser tab list still respawned Chrome
-# because its CDP WebSocket attempt failed independently. The user had to click
-# "Restore" to recover their tabs.
-# Timeout was -m 3 originally; bumped to -m 8 with a single retry after 2026-05-08
+# /json/list is read-only and can't trigger any spawn. A noon cron once tripped
+# this exact hazard: HTTP /json/version succeeded (Chrome was healthy enough to
+# respond to HTTP) but agent-browser tab list still respawned Chrome because its
+# CDP WebSocket attempt failed independently. User had to click "Restore" to
+# recover their tabs.
+# Timeout was -m 3 originally; bumped to -m 8 with a single retry after a later
 # 6:22 PM CDT skip — Chrome was busy and curl's 3s read returned a body with no
 # platform URLs in it, even though the tabs were pinned and present.
 probe_tabs() {

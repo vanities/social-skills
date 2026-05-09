@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# Cron entry: fire the /post-daily-devotional skill via headless Claude Code.
+# Cron entry: fire your daily-content skill via headless Claude Code.
+#
+# This is a TEMPLATE — copy to scripts/daily_content.sh (gitignored), make
+# executable, and add to your crontab. The skill name on the last line should
+# match the personal composite skill you've installed at .claude/skills/<name>/.
+#
+# Usage in crontab (e.g. noon local):
+#   0 12 * * * /bin/bash /absolute/path/to/social-skills/scripts/daily_content.sh
 
 set -euo pipefail
 
@@ -40,32 +47,27 @@ fi
 # Probe Chrome's tab list via plain HTTP. NEVER use agent-browser for any guard
 # step — agent-browser's `tab list` auto-spawns a fresh Chrome when its CDP
 # WebSocket can't connect, which kills the user's session. Plain HTTP to
-# /json/list is read-only and can't trigger any spawn. 2026-05-06 noon devotional
-# tripped this exact hazard: HTTP succeeded (Chrome was healthy enough to
-# respond to HTTP) but agent-browser tab list respawned Chrome anyway. User
-# had to click Restore to recover tabs. /json/list returns the full tab list,
-# which doubles as our "is this our Chrome" check.
-TAB_JSON=$(curl -sS -m 3 "http://127.0.0.1:${PORT}/json/list" 2>/dev/null || true)
+# /json/list is read-only and can't trigger any spawn.
+TAB_JSON=$(curl -sS -m 8 "http://127.0.0.1:${PORT}/json/list" 2>/dev/null || true)
 if [ -z "$TAB_JSON" ]; then
-  echo "$(date -u +%H:%M:%SZ) skipped — Chrome at port $PORT is unreachable (HTTP /json/list returned nothing; refusing to auto-spawn a fresh browser)"
+  echo "$(date -u +%H:%M:%SZ) skipped — Chrome at port $PORT is unreachable"
   exit 0
 fi
 
 if ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pinterest\.com|linkedin\.com'; then
-  echo "$(date -u +%H:%M:%SZ) skipped — Chrome alive on port $PORT but no platform tabs (possibly fresh/wrong Chrome)"
-  echo "tab snapshot: $(echo "$TAB_JSON" | grep -oE '\"url\":\"[^\"]*\"' | head -5 | tr '\n' ' ')"
+  echo "$(date -u +%H:%M:%SZ) skipped — Chrome alive on port $PORT but no platform tabs"
   exit 0
 fi
 
-# Boot the iOS simulator if none is booted. The skill needs a foregrounded
-# Swift Bible app to capture today's devotional. 2026-05-08 noon cron failed
-# silently because the wrapper didn't do this — the skill aborted at "no
-# booted simulator" and produced no log output.
+# Boot the iOS simulator if your composite skill needs one (delete this block
+# if your daily-content flow doesn't drive an iOS app). Set SOCIAL_SKILLS_SIM_UDID
+# in .env to pin a specific device; otherwise the wrapper falls back to the first
+# available iPhone 17.
 if ! xcrun simctl list devices 2>/dev/null | grep -q '(Booted)'; then
-  # Try the iPhone 17 Pro UDID we've used historically; fall back to whatever
-  # iPhone 17 family device is available.
-  SIM_UDID="${SOCIAL_SKILLS_SIM_UDID:-1D488BFC-505C-4A5E-BF6C-0A390AEDB8C9}"
-  if ! xcrun simctl boot "$SIM_UDID" 2>/dev/null; then
+  SIM_UDID="${SOCIAL_SKILLS_SIM_UDID:-}"
+  if [ -n "$SIM_UDID" ] && xcrun simctl boot "$SIM_UDID" 2>/dev/null; then
+    :
+  else
     SIM_UDID=$(xcrun simctl list devices available 2>/dev/null | grep -E '^\s+iPhone 17( Pro)? \(' | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
     if [ -z "$SIM_UDID" ] || ! xcrun simctl boot "$SIM_UDID" 2>/dev/null; then
       echo "$(date -u +%H:%M:%SZ) skipped — no iPhone 17 simulator could be booted"
@@ -74,13 +76,12 @@ if ! xcrun simctl list devices 2>/dev/null | grep -q '(Booted)'; then
   fi
   echo "$(date -u +%H:%M:%SZ) booted simulator $SIM_UDID"
   open -a Simulator
-  sleep 6   # let SpringBoard finish coming up before the skill's launch call
+  sleep 6
 fi
 
-# --dangerously-skip-permissions: cron can't prompt. The skill launches the
-# Swift Bible app, navigates to the Devotional tab, captures a screenshot,
-# drafts captions, and posts to IG/X/Pinterest — all operations validated
-# manually beforehand.
-claude --print --dangerously-skip-permissions "/post-daily-devotional"
+# --dangerously-skip-permissions: cron can't prompt for tool approvals.
+# Replace /post-daily-content with whatever skill name you installed at
+# .claude/skills/<name>/SKILL.md.
+claude --print --dangerously-skip-permissions "/post-daily-content"
 
 echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) cron complete ==="

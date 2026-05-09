@@ -11,8 +11,8 @@
 #   2 - target account not in the switcher popover (user must sign in to it manually)
 #   3 - switch attempted but the active handle didn't change
 #
-# Usage: bash scripts/x_switch_account.sh swift_bible
-#        bash scripts/x_switch_account.sh @vanities   # @ stripped automatically
+# Usage: bash scripts/x_switch_account.sh <handle>
+#        bash scripts/x_switch_account.sh @<handle>   # @ stripped automatically
 
 set -e
 

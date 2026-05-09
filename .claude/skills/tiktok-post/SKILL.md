@@ -24,10 +24,9 @@ Browser automation against the web upload would only let us post videos. Since t
 
 ## Account state
 
-- Handle: `@swiftbible` — note the **lack of underscore**, different from `@swift_bible` on IG / X.
-- Login: done manually 2026-05-04 (TikTok web sign-in is genuinely painful — CAPTCHAs, slider puzzles, email verification — auto-login is not worth attempting).
-- State file: `~/.config/agent-browser/tiktok-default.json` (~539 KB; much larger than other platforms because TikTok stores a lot of fingerprinting cookies).
-- Bio: "📖 Daily devotionals from the Swift Bible app. New every day at noon." (link field: `am2.biz/swiftbible`).
+- Login: TikTok web sign-in is painful (CAPTCHAs, slider puzzles, email verification). **Auto-login is not worth attempting** — sign in by hand once.
+- State file: `~/.config/agent-browser/tiktok-default.json` (typically ~500 KB; much larger than other platforms because TikTok stores a lot of fingerprinting cookies).
+- Note your TikTok handle may differ from your IG / X handle (TikTok username rules are looser; underscores commonly diverge across platforms).
 
 ## Paths forward (pick one before this skill becomes runnable)
 

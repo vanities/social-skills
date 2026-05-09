@@ -128,7 +128,7 @@ Use the `Write` tool to create `~/.social-skills/logs/login/x-default-<timestamp
   },
   "verification_challenge": null,
   "final_url":   "<url>",
-  "state_file":  "/Users/vanities/.config/agent-browser/x-default.json"
+  "state_file":  "~/.config/agent-browser/x-default.json"
 }
 ```
 

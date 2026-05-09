@@ -104,7 +104,7 @@ Use the `Write` tool to create `~/.social-skills/logs/login/linkedin-default-<ti
   },
   "verification_pin_required": true,
   "final_url":  "<url>",
-  "state_file": "/Users/vanities/.config/agent-browser/linkedin-default.json"
+  "state_file": "~/.config/agent-browser/linkedin-default.json"
 }
 ```
 

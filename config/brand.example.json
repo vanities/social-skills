@@ -1,0 +1,72 @@
+{
+  "_comment": "Per-user brand config. Copy this file to brand.json (gitignored) and fill in your values. The shape supports a parent org with N child brands — useful if you have multiple products posted under one company. If you only have one brand, just leave a single key under `brands`.",
+
+  "_setup": "cp config/brand.example.json config/brand.json && $EDITOR config/brand.json",
+
+  "_resolution": "Skills resolve which brand to target like this: (1) use the slug passed as the first arg if given (e.g. `/x-warm myproject`); (2) else use `default_brand`. Then they pull values from `brands.<slug>.<platform>.<key>`. Org-level values (LinkedIn company id, parent name) are shared across all brands.",
+
+  "default_brand": "main",
+
+  "org": {
+    "_comment": "Org-level info shared across all brands. LinkedIn company-page posts go FROM here, not from a per-brand handle (a single LinkedIn company page typically represents the parent org, not each product). If you don't have a company page or post only to your personal feed, leave linkedin_company_id null.",
+    "name": "Example Org",
+    "linkedin_company_id": null
+  },
+
+  "brands": {
+    "main": {
+      "_comment": "Each brand under your org. The slug ('main', 'project_a', 'side_app') is what skills accept as their first arg. Add more sibling keys for additional brands.",
+      "instagram": {
+        "_comment": "default_account is the label passed to /instagram-post and used as the .env credential prefix (INSTAGRAM_<UPPERCASE_LABEL>_USERNAME). own_handle is YOUR account handle as it appears on IG (no @) — used by /instagram-warm to skip your own posts in the feed.",
+        "default_account": "myaccount",
+        "own_handle": "my_account_handle"
+      },
+      "x": {
+        "_comment": "default_handle is what /x-warm targets and what composite skills pass to /x-post when you invoke them under this brand. own_handle skips your own tweets in the warm feed. topic_filter_regex is the case-insensitive regex /x-warm matches against tweet text — likes only fire on tweets that match. exclude_handles_substring is a comma-separated list of substrings; any author handle containing one is skipped (use for parody / impersonation risk).",
+        "default_handle": "myhandle",
+        "own_handle": "myhandle",
+        "topic_filter_regex": "\\b(your|topic|keywords|here)\\b",
+        "exclude_handles_substring": ""
+      },
+      "pinterest": {
+        "_comment": "default_account is your Pinterest username (no @, no slash). default_board is where /post-daily-content publishes. feature_board is where /feature-post publishes (Pinterest's algorithm splits 'evergreen' from 'how-to / explainer' — keep them on different boards). topic_filter_regex gates which pins /pinterest-warm will save.",
+        "default_account": "myaccount",
+        "own_handle": "myaccount",
+        "default_board": "Inspiration",
+        "feature_board": "How To",
+        "topic_filter_regex": "\\b(your|topic|keywords|here)\\b",
+        "exclude_handles_substring": ""
+      },
+      "brand": {
+        "_comment": "Surface-level metadata used in caption templates. name is what skills call the brand in caption boilerplate. url is the destination link auto-included in posts. voice is a freeform 1-2 sentence description /feature-post and /post-daily-content can use to tone the caption draft.",
+        "name": "My Brand",
+        "url": "https://example.com",
+        "voice": "Friendly, builder-flavored, no exclamation marks."
+      }
+    },
+
+    "_example_second_brand": {
+      "_comment": "Delete this stub if you only have one brand. It's here to show what a multi-brand setup looks like — e.g. an org named 'Acme Inc' with two products 'gizmo' and 'widget'. Each gets its own handles and topic filter; both post to the SAME LinkedIn company page (org.linkedin_company_id) under the parent org.",
+      "instagram": { "default_account": "acme_widget", "own_handle": "acme_widget" },
+      "x": {
+        "default_handle": "acme_widget",
+        "own_handle": "acme_widget",
+        "topic_filter_regex": "\\b(productivity|tools|workflow)\\b",
+        "exclude_handles_substring": ""
+      },
+      "pinterest": {
+        "default_account": "acme_widget",
+        "own_handle": "acme_widget",
+        "default_board": "Productivity Tips",
+        "feature_board": "Workflow Hacks",
+        "topic_filter_regex": "\\b(productivity|tools|workflow)\\b",
+        "exclude_handles_substring": ""
+      },
+      "brand": {
+        "name": "Acme Widget",
+        "url": "https://acme.example.com/widget",
+        "voice": "Builder-flavored, dev tools angle."
+      }
+    }
+  }
+}

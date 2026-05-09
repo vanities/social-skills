@@ -21,3 +21,38 @@ articles/
 .vscode/
 *.swp
 .claude/scheduled_tasks.lock
+
+# --- Personal config (see PERSONAL.md) ---
+# The repo is structured so all PII / brand-specific content lives in files
+# that are gitignored here, with parallel `*.example` versions committed as
+# templates. Copy from the example, fill in your handles/IDs, and the working
+# files below are picked up automatically.
+
+# Per-user brand config (handles, company id, content domain). Schema in
+# config/brand.example.json — copy that to config/brand.json and edit.
+config/brand.json
+
+# Per-user CLAUDE.md addendum — Claude Code auto-loads any *.local.md
+# alongside CLAUDE.md. Shape in CLAUDE.local.md.example.
+CLAUDE.local.md
+*.local.md
+!*.local.md.example
+
+# Wholly personal area: anything you don't want committed. Mirror of
+# personal.example/ for things you've copied + customized but don't want
+# to share back upstream.
+personal/
+
+# Brand-specific composite skill (drives an iOS app, captions are domain
+# specific). Template in personal.example/skills/post-daily-content/. Copy
+# to .claude/skills/post-daily-<your-domain>/ and customize.
+.claude/skills/post-daily-devotional/
+.claude/skills/post-daily-content/
+
+# Brand-specific cron entrypoints + ancillary helpers. Templates in
+# personal.example/scripts/. Copy to scripts/ if you want them on disk
+# under the same names your crontab uses.
+scripts/daily_devotional.sh
+scripts/daily_content.sh
+scripts/devotional_video.sh
+scripts/devotional_video_remote.sh
