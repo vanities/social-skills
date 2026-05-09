@@ -171,7 +171,7 @@ After publish: the form clears, `Pin drafts (N)` decrements by one, and the new 
 agent-browser screenshot /tmp/pinterest-post-default-$(date +%Y-%m-%dT%H%M%S).png
 ```
 
-Use `Write` to create `~/.social-agents/logs/post/pinterest-default-<timestamp>.json`:
+Use `Write` to create `~/.social-skills/logs/post/pinterest-default-<timestamp>.json`:
 
 ```json
 {

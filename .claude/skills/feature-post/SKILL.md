@@ -17,7 +17,7 @@ This skill composes:
 - `scripts/pad_ios_video.sh` — pads tall video to 9:16 (IG Reels / LinkedIn / X video)
 - `/linkedin-post 104970470 <media...> <caption>` — AM2 LLC company page
 - `/instagram-post swiftbible <padded-media> <caption>` — swift_bible IG
-- `/x-post <thread-json>` — @swift_bible reply chain or single tweet
+- `/x-post swift_bible <thread-json>` — @swift_bible reply chain or single tweet (account is REQUIRED — see `/x-post` for switcher logic)
 - `/pinterest-post <pin-json>` — swiftbible Pinterest, **search-rewritten** title + description, board defaults to `Bible Study Tools` for feature pins (different from `Daily Devotionals` which is reserved for per-day verse pins)
 
 Defaults are baked for the Swift Bible app. Override platform target args (LinkedIn company id, IG account, Pinterest board) inline if posting for a different brand.
@@ -33,7 +33,7 @@ Save the description for use in caption drafting. Slugify it for the screenshot 
 ```bash
 SLUG=$(echo "$DESC" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//' | cut -c1-40)
 DATE=$(date +%Y-%m-%d)
-SCREENSHOT_DIR=~/.social-agents/screenshots/feature-posts/${DATE}-${SLUG}
+SCREENSHOT_DIR=~/.social-skills/screenshots/feature-posts/${DATE}-${SLUG}
 mkdir -p "$SCREENSHOT_DIR"
 ```
 
@@ -135,7 +135,7 @@ For each enabled platform in `$2`:
 
 - **LinkedIn**: `/linkedin-post 104970470 <padded-screenshot-1> [<padded-screenshot-2> ...] "<caption>"` — pass multiple media paths for a carousel.
 - **Instagram**: `/instagram-post swiftbible <padded-screenshot-1> [<padded-screenshot-2> ...] "<caption>"` — same multi-file convention.
-- **X**: `/x-post /tmp/x-thread-${SLUG}.json` — `/x-post` posts T0 standalone then replies through T1, T2, ...
+- **X**: `/x-post swift_bible /tmp/x-thread-${SLUG}.json` — `/x-post` switches the X session to @swift_bible (no-op if already there), posts T0 standalone, then replies through T1, T2, ...
 - **Pinterest**: `/pinterest-post /tmp/pinterest-${SLUG}.json` — single pin in `Bible Study Tools` board with search-rewritten content.
 
 Wait for each skill's run log before starting the next. If one fails, ask before continuing — the user may want to fix and re-run that platform only.

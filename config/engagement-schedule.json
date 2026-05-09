@@ -33,7 +33,7 @@
           "second_probability_pct": 50,
           "max_per_run": 2,
           "corpus_path": "config/comment-corpus.json",
-          "history_path": "~/.social-agents/state/comment-history.json",
+          "history_path": "~/.social-skills/state/comment-history.json",
           "phrase_repeat_cooldown_days": 7,
           "author_repeat_cooldown_days": 30,
           "typer_script": "scripts/type_human.sh"

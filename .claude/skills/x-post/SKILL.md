@@ -1,15 +1,17 @@
 ---
 name: x-post
-description: Post a tweet or a multi-tweet thread on X (Twitter). The single argument is a path to a JSON file describing the tweets. Each entry has `text` (≤280 chars) and optional `media` (1–4 image paths). Use when the user says "post to X", "tweet this", or runs /x-post.
+description: Post a tweet or a multi-tweet thread on X (Twitter) from a specific account. First arg is the X handle (no `@`); second is a path to a JSON file describing the tweets. Each entry has `text` (≤280 chars) and optional `media` (1–4 image paths). Use when the user says "post to X", "tweet this", or runs /x-post.
 disable-model-invocation: true
-argument-hint: [thread-json]
-allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash(jq *) Bash(cat *) Bash(mkdir *) Read(*)
+argument-hint: [account] [thread-json]
+allowed-tools: Bash(agent-browser *) Bash(bash *) Bash(test *) Bash(date *) Bash(grep *) Bash(jq *) Bash(cat *) Bash(mkdir *) Read(*)
 ---
 
 # Post to X (Twitter)
 
-Account: `default` (single X account; add per-account split if a second one is added).
+Account handle: `$0` (no `@` — e.g. `swift_bible`, `vanities`). **Required** — there is no default. Caller is responsible for passing the right one (see CLAUDE.md account-routing rules).
 Thread file: `$1` — JSON array of tweet objects.
+
+The browser may currently be signed in as a different account. This skill switches to `$0` automatically before composing — see Step 2.
 
 ## Thread file format
 
@@ -48,14 +50,15 @@ If a future X UI change makes secondary file inputs respond to `setInputFiles`, 
 ## Step 1: Sanity checks
 
 ```!
-test -f "$1" && jq . "$1" > /dev/null && echo "thread file ok ($(jq 'length' "$1") tweets)" || echo "MISSING OR BAD JSON"
+test -n "$0" || { echo "ACCOUNT MISSING — usage: /x-post <handle> <thread.json>"; exit 1; }
+test -f "$1" && jq . "$1" > /dev/null && echo "thread file ok ($(jq 'length' "$1") tweets) for @$0" || echo "MISSING OR BAD JSON"
 jq -r '.[].text | length' "$1" | awk '$1 > 280 { print "TOO LONG: tweet "NR" is "$1" chars"; exit 1 }' || true
 jq -r '.[].media // [] | .[]' "$1" | xargs -I {} bash -c 'test -f "{}" || echo "MEDIA MISSING: {}"'
 ```
 
 Abort if any check fails.
 
-## Step 2: Find or open the X tab
+## Step 2: Find or open the X tab + switch to the right account
 
 ```bash
 # Switch to the X tab via curl-based discovery (NEVER `agent-browser tab list`
@@ -63,13 +66,19 @@ Abort if any check fails.
 # fallback in one step. See feedback_no_agent_browser_in_cron_guard.md.
 bash scripts/switch_to_platform_tab.sh "x.com" "https://x.com/home"
 agent-browser wait --load networkidle
+
+# CRITICAL: switch the X session to the requested account if it isn't already.
+# The browser may have been left on a different account between runs. Without
+# this, /post-daily-devotional cron at noon could post devotionals from @vanities
+# (or any other signed-in account). The helper is a no-op when already on target.
+bash scripts/x_switch_account.sh "$0"
 ```
 
 ```!
 agent-browser get url
 ```
 
-If `/i/flow/login`, abort and tell the user to run `/x-login`. Otherwise wait `--load networkidle`.
+If `/i/flow/login`, abort and tell the user to run `/x-login`. If `x_switch_account.sh` exits non-zero, abort and tell the user the target account isn't in the popover (sign in manually first).
 
 ## Step 3: Compose tweet 0 (the root)
 
@@ -79,7 +88,7 @@ agent-browser click @<POST_LINK_REF>
 agent-browser wait $(bash scripts/jitter.sh 700 1500)
 ```
 
-The compose modal opens with one **"Post text"** textbox. **Refs shift on every action** — always re-snapshot before each click/type.
+The compose modal opens with one **"Post text"** textbox. **Refs shift on every action** — always re-snapshot before each click/type. **Re-snapshot specifically before clicking the Post button** — its ref shifts after media upload, and clicking a stale ref silently no-ops without an error (you'll be left on `x.com/compose/post` with the modal still open). Confirmed live 2026-05-07.
 
 ```bash
 TEXT0=$(jq -r '.[0].text' "$1")
@@ -126,10 +135,10 @@ After the post, a "Your post was sent. View" toast appears. X may also surface a
 
 For `i` from 1 to `n-1`:
 
-a. **Find the previous tweet's status URL.** Navigate to the profile to read it:
+a. **Find the previous tweet's status URL.** Navigate to the active account's profile to read it:
 
 ```bash
-agent-browser open https://x.com/swift_bible
+agent-browser open "https://x.com/$0"   # $0 is the handle the skill was invoked with
 agent-browser wait --load networkidle
 PREV_URL=$(agent-browser eval "Array.from(document.querySelectorAll('a[href*=\"/status/\"]')).map(a=>a.href.match(/\\/status\\/\\d+\$/)?.[0]).filter(Boolean)[0]" 2>&1 | tail -2 | head -1 | tr -d '"')
 agent-browser open "https://x.com${PREV_URL}"
@@ -182,20 +191,24 @@ agent-browser screenshot /tmp/x-post-default-$(date +%Y-%m-%dT%H%M%S).png
 
 ## Step 7: Run log
 
-Use `Write` to create `~/.social-agents/logs/post/x-default-<timestamp>.json`:
+Use `Write` to create `~/.social-skills/logs/post/x-$0-<timestamp>.json`:
 
 ```json
 {
   "ts_start": "...",
   "ts_end":   "...",
   "platform": "x",
-  "account":  "default",
+  "account":  "$0",
   "action":   "post",
   "outcome":  "success | failed",
   "thread_file": "$1",
   "tweet_count": <n>,
   "tweet_lengths": [<chars>, ...],
   "media_per_tweet": [<count>, ...],
+  "account_switch": {
+    "needed":  "true | false",
+    "before":  "<handle that was active before this run>"
+  },
   "form_fields_used": {
     "post_link":          "@<ref>",
     "tweet_textbox_refs": ["@<ref>", ...],

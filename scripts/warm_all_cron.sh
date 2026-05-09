@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-LOG_DIR="${HOME}/.social-agents/logs/cron"
+LOG_DIR="${HOME}/.social-skills/logs/cron"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/warm-$(date +%Y-%m-%d).log"
 exec >> "$LOG_FILE" 2>&1
@@ -20,14 +20,14 @@ export PATH="$HOME/.vite-plus/bin:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/
 
 cd "$(dirname "$0")/.."
 
-# Read SOCIAL_AGENTS_CHROME_PROFILE + CLAUDE_CODE_OAUTH_TOKEN from .env
+# Read SOCIAL_SKILLS_CHROME_PROFILE + CLAUDE_CODE_OAUTH_TOKEN from .env
 # (single-var greps — never `source`, see CLAUDE.md re: passwords with $).
 if [[ -f .env ]]; then
-  PROFILE="$(grep -m1 '^SOCIAL_AGENTS_CHROME_PROFILE=' .env | cut -d= -f2-)"
+  PROFILE="$(grep -m1 '^SOCIAL_SKILLS_CHROME_PROFILE=' .env | cut -d= -f2-)"
   TOKEN="$(grep -m1 '^CLAUDE_CODE_OAUTH_TOKEN=' .env | cut -d= -f2-)"
   [[ -n "$TOKEN" ]] && export CLAUDE_CODE_OAUTH_TOKEN="$TOKEN"
 fi
-PROFILE="${PROFILE:-$HOME/.social-agents/chrome-profile}"
+PROFILE="${PROFILE:-$HOME/.social-skills/chrome-profile}"
 PROFILE="${PROFILE/#\~/$HOME}"
 
 # Strict guard: skip cleanly unless (a) Chrome is alive with OUR profile,
@@ -48,9 +48,21 @@ fi
 # enough to respond to HTTP) but agent-browser tab list still respawned Chrome
 # because its CDP WebSocket attempt failed independently. The user had to click
 # "Restore" to recover their tabs.
-TAB_JSON=$(curl -sS -m 3 "http://127.0.0.1:${PORT}/json/list" 2>/dev/null || true)
+# Timeout was -m 3 originally; bumped to -m 8 with a single retry after 2026-05-08
+# 6:22 PM CDT skip — Chrome was busy and curl's 3s read returned a body with no
+# platform URLs in it, even though the tabs were pinned and present.
+probe_tabs() {
+  curl -sS -m 8 "http://127.0.0.1:${PORT}/json/list" 2>/dev/null || true
+}
+TAB_JSON=$(probe_tabs)
+if [ -z "$TAB_JSON" ] || ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pinterest\.com|linkedin\.com'; then
+  echo "$(date -u +%H:%M:%SZ) probe miss — retrying in 2s"
+  sleep 2
+  TAB_JSON=$(probe_tabs)
+fi
+
 if [ -z "$TAB_JSON" ]; then
-  echo "$(date -u +%H:%M:%SZ) skipped — Chrome at port $PORT is unreachable (HTTP /json/list returned nothing; refusing to auto-spawn a fresh browser)"
+  echo "$(date -u +%H:%M:%SZ) skipped — Chrome at port $PORT is unreachable (HTTP /json/list returned nothing after retry; refusing to auto-spawn a fresh browser)"
   exit 0
 fi
 
@@ -59,13 +71,13 @@ fi
 # this is probably a fresh Chrome agent-browser spawned earlier — don't fire
 # a warm pass against it (it has no logged-in sessions either).
 if ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pinterest\.com|linkedin\.com'; then
-  echo "$(date -u +%H:%M:%SZ) skipped — Chrome alive on port $PORT but no platform tabs (possibly fresh/wrong Chrome)"
-  echo "tab snapshot: $(echo "$TAB_JSON" | grep -oE '\"url\":\"[^\"]*\"' | head -5 | tr '\n' ' ')"
+  echo "$(date -u +%H:%M:%SZ) skipped — Chrome alive on port $PORT but no platform tabs after retry (possibly fresh/wrong Chrome)"
+  echo "tab snapshot: $(echo "$TAB_JSON" | grep -oE '\"url\":\s*\"[^\"]*\"' | head -5 | tr '\n' ' ')"
   exit 0
 fi
 # --dangerously-skip-permissions: cron can't prompt; the skill is read-only
 # from a permissions standpoint (browser navigation + JSON state file writes
-# under ~/.social-agents/state/) and has been live-tested manually.
+# under ~/.social-skills/state/) and has been live-tested manually.
 claude --print --dangerously-skip-permissions "/warm-all"
 
 echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) warm cron complete ==="

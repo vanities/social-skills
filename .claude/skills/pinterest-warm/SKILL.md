@@ -1,6 +1,6 @@
 ---
 name: pinterest-warm
-description: Run a single warming pass on Pinterest (swiftbible) — scroll the home feed, save 1-3 pins, react (heart) on 1-2, optionally follow one creator. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-agents/state/engagement-state.json. Use when the user says "warm pinterest", "engage on pinterest", or runs /pinterest-warm. Also called by /warm-all on a schedule.
+description: Run a single warming pass on Pinterest (swiftbible) — scroll the home feed, save 1-3 pins, react (heart) on 1-2, optionally follow one creator. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm pinterest", "engage on pinterest", or runs /pinterest-warm. Also called by /warm-all on a schedule.
 disable-model-invocation: true
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
@@ -15,7 +15,7 @@ Same shape as `/x-warm` but with `pinterest` instead of `x`:
 
 ```bash
 CFG=config/engagement-schedule.json
-STATE=~/.social-agents/state/engagement-state.json
+STATE=~/.social-skills/state/engagement-state.json
 NOW_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TODAY=$(date +%Y-%m-%d)
 HOUR=$(date +%H | sed 's/^0*//'); HOUR=${HOUR:-0}
@@ -181,7 +181,7 @@ Comments ride the strictest pipeline of any warming action because *what* you sa
 
 ```bash
 TOUCHED_PINS=()   # within-run set; populated by save/react execution above
-COMMENT_HISTORY=~/.social-agents/state/comment-history.json
+COMMENT_HISTORY=~/.social-skills/state/comment-history.json
 CORPUS=config/comment-corpus.json
 TYPE_HUMAN=scripts/type_human.sh
 
@@ -334,7 +334,7 @@ jq --arg now "$NOW_ISO" \
 
 ## Step 6: Run log
 
-`~/.social-agents/logs/warm/pinterest-default-<timestamp>.json` — same shape as the `/x-warm` log. Capture `pin_id` (extracted from the URL after click) for each `save` action, plus the board it landed in.
+`~/.social-skills/logs/warm/pinterest-default-<timestamp>.json` — same shape as the `/x-warm` log. Capture `pin_id` (extracted from the URL after click) for each `save` action, plus the board it landed in.
 
 ## Step 7: Report
 

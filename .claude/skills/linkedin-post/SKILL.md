@@ -137,7 +137,7 @@ The snapshot at this point also includes a **"View post"** link — capture its 
 agent-browser screenshot /tmp/linkedin-post-$0-$(date +%Y-%m-%dT%H%M%S).png
 ```
 
-Use `Write` to create `~/.social-agents/logs/post/linkedin-$0-<timestamp>.json`:
+Use `Write` to create `~/.social-skills/logs/post/linkedin-$0-<timestamp>.json`:
 
 ```json
 {

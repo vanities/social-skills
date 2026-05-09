@@ -9,7 +9,7 @@ allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bas
 # Instagram login for account `$0`
 
 State path (backup, for cron / cold-start runs): `~/.config/agent-browser/instagram-$0.json`
-Log path: `~/.social-agents/logs/login/instagram-$0-<timestamp>.json`
+Log path: `~/.social-skills/logs/login/instagram-$0-<timestamp>.json`
 Reference: `docs/platforms/instagram.md`.
 
 The default mode of operation is the **shared headed Chrome** — keep the browser alive across sessions so the user and the agent both work in it. State files exist as a fallback for fresh-process runs (cron).
@@ -91,12 +91,12 @@ Expected: `https://www.instagram.com/`. If still on `/accounts/login/`, capture 
 ## Save state (backup)
 
 ```!
-mkdir -p ~/.config/agent-browser ~/.social-agents/logs/login && agent-browser state save ~/.config/agent-browser/instagram-$0.json
+mkdir -p ~/.config/agent-browser ~/.social-skills/logs/login && agent-browser state save ~/.config/agent-browser/instagram-$0.json
 ```
 
 ## Write the run log
 
-Use the `Write` tool to create `~/.social-agents/logs/login/instagram-$0-<timestamp>.json`:
+Use the `Write` tool to create `~/.social-skills/logs/login/instagram-$0-<timestamp>.json`:
 
 ```json
 {

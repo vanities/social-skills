@@ -1,6 +1,6 @@
 ---
 name: instagram-warm
-description: Run a single warming pass on Instagram (swift_bible) — scroll the home feed, like 1-3 posts. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-agents/state/engagement-state.json. Use when the user says "warm instagram", "engage on ig", or runs /instagram-warm. Also called by /warm-all on a schedule.
+description: Run a single warming pass on Instagram (swift_bible) — scroll the home feed, like 1-3 posts. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm instagram", "engage on ig", or runs /instagram-warm. Also called by /warm-all on a schedule.
 disable-model-invocation: true
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
@@ -120,7 +120,7 @@ jq --arg now "$NOW_ISO" --argjson plus 1 \
 
 ## Step 6: Run log
 
-`~/.social-agents/logs/warm/instagram-default-<timestamp>.json` — same shape as `/x-warm`'s log. Record the post author and handle for each `like`.
+`~/.social-skills/logs/warm/instagram-default-<timestamp>.json` — same shape as `/x-warm`'s log. Record the post author and handle for each `like`.
 
 ## Step 7: Report
 

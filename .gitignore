@@ -6,12 +6,15 @@
 !.env.example
 
 # Browser state, media, logs live under $HOME/.config/agent-browser/
-# and $HOME/.social-agents/. These entries are defensive in case anyone
+# and $HOME/.social-skills/. These entries are defensive in case anyone
 # overrides paths into the repo.
 profiles/
 sessions/
 media/
 logs/
+
+# Drafted long-form posts / articles — local only, not tracked.
+articles/
 
 # Editor / OS
 .idea/

@@ -8,8 +8,8 @@ We use **real Chrome** (`/Applications/Google Chrome.app/...`), not Chrome for T
 
 ## Profile
 
-Default path: `~/.social-agents/chrome-profile/` (override via `SOCIAL_AGENTS_CHROME_PROFILE`).
-Default binary: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` (override via `SOCIAL_AGENTS_CHROME_BINARY`).
+Default path: `~/.social-skills/chrome-profile/` (override via `SOCIAL_SKILLS_CHROME_PROFILE`).
+Default binary: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` (override via `SOCIAL_SKILLS_CHROME_BINARY`).
 
 Launch the browser at the start of a work session:
 
@@ -74,6 +74,6 @@ The Mac must be awake at fire times — cron does not wake the machine. If you r
 
 Three layers:
 
-- **Shell-level** — anything before Claude starts: `~/.social-agents/logs/cron/<date>.log` (devotional) and `cron/warm-<date>.log` (warming).
-- **Per-skill JSON** — every login / post / warm run writes `~/.social-agents/logs/<action>/<platform>-<account>-<ts>.json` with form refs discovered, dialogs handled, screenshots, and outcome. Form-field refs are the breadcrumb that makes UI changes easy to chase.
-- **Engagement state** — `~/.social-agents/state/engagement-state.json` tracks per-platform `last_run_iso` and today's action counts, used by `/warm-all` to enforce the daily action budget and the global min-gap.
+- **Shell-level** — anything before Claude starts: `~/.social-skills/logs/cron/<date>.log` (devotional) and `cron/warm-<date>.log` (warming).
+- **Per-skill JSON** — every login / post / warm run writes `~/.social-skills/logs/<action>/<platform>-<account>-<ts>.json` with form refs discovered, dialogs handled, screenshots, and outcome. Form-field refs are the breadcrumb that makes UI changes easy to chase.
+- **Engagement state** — `~/.social-skills/state/engagement-state.json` tracks per-platform `last_run_iso` and today's action counts, used by `/warm-all` to enforce the daily action budget and the global min-gap.

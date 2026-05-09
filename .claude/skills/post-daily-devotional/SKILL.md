@@ -2,21 +2,51 @@
 name: post-daily-devotional
 description: Capture the iOS simulator's daily devotional, draft platform-tailored captions, and fan out to Instagram (swiftbible) + X (@swift_bible) + Pinterest (swiftbible). Skips LinkedIn (LinkedIn = feature posts only). Use when the user says "post the devotional", "publish today's devotional", or runs /post-daily-devotional. Cron-fired daily at 12:00 local.
 disable-model-invocation: true
-allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(test *) Bash(date *) Bash(ls *) Bash(cat *) Bash(mkdir *) Bash(cp *) Read(*) Write(*) Skill(instagram-post *) Skill(x-post *) Skill(pinterest-post *)
+allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(bash *) Bash(test *) Bash(date *) Bash(ls *) Bash(cat *) Bash(mkdir *) Bash(cp *) Bash(sleep *) Read(*) Write(*) Skill(instagram-post *) Skill(x-post *) Skill(pinterest-post *) mcp__XcodeBuildMCP__tap mcp__XcodeBuildMCP__session_set_defaults mcp__XcodeBuildMCP__snapshot_ui
 ---
 
 # Post today's daily devotional to IG + X + Pinterest
 
-Default account: `swiftbible` (override via `$SOCIAL_AGENTS_IG_ACCOUNT`).
+Default account: `swiftbible` (override via `$SOCIAL_SKILLS_IG_ACCOUNT`).
 Skips LinkedIn — that channel is reserved for feature ships, not daily content.
 
-## Step 1: Verify simulator booted
+## Step 1: Verify simulator booted (wrapper does this for cron path)
 
 ```!
-xcrun simctl list devices | grep -q '(Booted)' && echo "ok" || echo "NO BOOTED SIMULATOR"
+xcrun simctl list devices | grep -q '(Booted)' && echo "ok" || echo "NO BOOTED SIMULATOR — interactive: boot one before retrying. Cron: scripts/daily_devotional.sh handles boot before invoking this skill."
 ```
 
 Abort if not booted.
+
+## Step 1b: Launch the Swift Bible app and navigate to the Devotional tab
+
+```bash
+xcrun simctl launch booted com.vanities.swiftbible
+# SpringBoard handoff + first-frame render takes ~3s
+sleep 3
+```
+
+A donation-prompt sheet sometimes opens on launch ("swiftbible Needs Your Help" / Donate / Not now). It blocks all other interaction until dismissed. Probe via `mcp__XcodeBuildMCP__snapshot_ui` and look for `AXLabel: "Not now"` — if found, tap it. If absent, skip.
+
+```
+mcp__XcodeBuildMCP__session_set_defaults({simulatorId: "<booted-udid>"})   # one-off per session
+# probe + dismiss donation modal:
+mcp__XcodeBuildMCP__tap({label: "Not now"})   # safe to call; errors silently if not present
+```
+
+If the snapshot shows the donation sheet but `tap` by label fails, fall back to a coordinate tap at the "Not now" frame y/2. The dismiss-donation step is best-effort: a stuck donation modal blocks the screenshot, so we'd rather error early than capture an unusable screenshot.
+
+Then tap the **Devotional** tab in the bottom bar. SwiftUI tab bars don't expose accessibility labels for individual tabs (they show as `Tab Bar` group with empty children), so use a coordinate tap. On iPhone 17 Pro (402pt wide), the three tabs Bible / Devotional / Settings span the left ~75% of the bar plus a floating Search circle on the right. Centers approx: Bible ≈ 75 / Devotional ≈ 170 / Settings ≈ 265 / Search circle ≈ 360, all at y ≈ 825.
+
+```
+mcp__XcodeBuildMCP__tap({x: 170, y: 825})
+```
+
+Wait ~2s for the Devotional view to render, then proceed.
+
+```bash
+sleep 2
+```
 
 ## Step 2: Capture + pad
 
@@ -64,7 +94,7 @@ JSON
 
 ### Instagram (long, descriptive)
 
-Honor `~/.social-agents/daily-devotional-caption.txt` if present (manual override). Otherwise auto-generate to `/tmp/dd-ig-caption.txt`:
+Honor `~/.social-skills/daily-devotional-caption.txt` if present (manual override). Otherwise auto-generate to `/tmp/dd-ig-caption.txt`:
 
 ```
 Today's reading from the Swift Bible app — <reference>:
@@ -116,8 +146,10 @@ Sequentially invoke each platform skill. **Continue on failure** — log the err
 /instagram-post swiftbible "$PADDED" "$(cat /tmp/dd-ig-caption.txt)"
 IG_OUTCOME=$?
 
-# 2. X
-/x-post /tmp/dd-x-thread.json
+# 2. X — explicit handle prevents posting to the wrong account if the
+#       browser was left on @vanities (or anyone else) between cron runs.
+#       /x-post will switch the X session to swift_bible before posting.
+/x-post swift_bible /tmp/dd-x-thread.json
 X_OUTCOME=$?
 
 # 3. Pinterest
@@ -129,7 +161,7 @@ In practice, invoke each via the Skill tool so the agent can read each skill's r
 
 ## Step 6: Roll-up run log
 
-Write `~/.social-agents/logs/daily-devotional-fanout-<date>.json`:
+Write `~/.social-skills/logs/daily-devotional-fanout-<date>.json`:
 
 ```json
 {
@@ -150,10 +182,10 @@ Per-platform outcome with permalinks if available. If any platform reported a ST
 ## Cron
 
 ```cron
-0 12 * * * /bin/bash /Users/vanities/git/work/me/social-agents/scripts/daily_devotional.sh
+0 12 * * * /bin/bash /Users/vanities/git/work/me/social-skills/scripts/daily_devotional.sh
 ```
 
-The `daily_devotional.sh` wrapper just `cd`s into the repo and runs `claude --print "/post-daily-devotional"`. Logs go to `~/.social-agents/logs/cron/<date>.log`.
+The `daily_devotional.sh` wrapper just `cd`s into the repo and runs `claude --print "/post-daily-devotional"`. Logs go to `~/.social-skills/logs/cron/<date>.log`.
 
 ## Failure modes
 

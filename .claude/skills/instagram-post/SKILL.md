@@ -221,7 +221,7 @@ agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-lab
 agent-browser screenshot /tmp/instagram-post-$0-$(date +%Y-%m-%dT%H%M%S).png
 ```
 
-Use the `Write` tool to create `~/.social-agents/logs/post/instagram-$0-<timestamp>.json`:
+Use the `Write` tool to create `~/.social-skills/logs/post/instagram-$0-<timestamp>.json`:
 
 ```json
 {

@@ -11,9 +11,9 @@
 set -uo pipefail
 
 INTERVAL="${1:-1}"
-PROFILE="${SOCIAL_AGENTS_CHROME_PROFILE:-$HOME/.social-agents/chrome-profile}"
+PROFILE="${SOCIAL_SKILLS_CHROME_PROFILE:-$HOME/.social-skills/chrome-profile}"
 PROFILE="${PROFILE/#\~/$HOME}"
-LOG_DIR="${HOME}/.social-agents/logs"
+LOG_DIR="${HOME}/.social-skills/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/chrome-watch-$(date +%Y%m%d-%H%M%S).log"
 

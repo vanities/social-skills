@@ -8,7 +8,7 @@ allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bas
 # X (Twitter) login
 
 State path (backup): `~/.config/agent-browser/x-default.json`
-Log path:           `~/.social-agents/logs/login/x-default-<timestamp>.json`
+Log path:           `~/.social-skills/logs/login/x-default-<timestamp>.json`
 Reference:          `docs/platforms/x.md` (write this if it doesn't exist).
 
 `.env` uses unsplit `TWITTER_USERNAME` / `TWITTER_PASSWORD` (single account; same convention as LinkedIn). The username can be a handle, email, or phone — X accepts all three on the first screen.
@@ -101,13 +101,13 @@ Expected: `x.com/home`. Anything else → write log with `outcome: failed`, abor
 ## Save state
 
 ```!
-mkdir -p ~/.config/agent-browser ~/.social-agents/logs/login
+mkdir -p ~/.config/agent-browser ~/.social-skills/logs/login
 agent-browser state save ~/.config/agent-browser/x-default.json
 ```
 
 ## Write the run log
 
-Use the `Write` tool to create `~/.social-agents/logs/login/x-default-<timestamp>.json`:
+Use the `Write` tool to create `~/.social-skills/logs/login/x-default-<timestamp>.json`:
 
 ```json
 {

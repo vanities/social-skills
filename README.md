@@ -1,4 +1,6 @@
-# social-agents
+# social-skills
+
+*because I'm terrible at being social.*
 
 Skill-driven social media automation. The agent (Claude Code, OAuth-authed) does the work; this repo provides the playbook.
 
@@ -37,8 +39,8 @@ Skill-driven social media automation. The agent (Claude Code, OAuth-authed) does
 
 ```bash
 # 1. Clone + cd in
-git clone git@github.com:vanities/social-agents.git
-cd social-agents
+git clone git@github.com:vanities/social-skills.git
+cd social-skills
 
 # 2. Add credentials (only the platforms you'll use)
 cp .env.example .env
@@ -88,7 +90,7 @@ Pure-broadcast accounts get throttled. These skills mimic organic behavior — s
 - **No auto-follow on X / IG** for fresh accounts; Pinterest follow is allowed but rare.
 - All actions wait `4–18s` jitter between each, refs are re-snapshotted before every click.
 
-Daily action budgets, weights, and time windows live in [`config/engagement-schedule.json`](config/engagement-schedule.json). Per-platform state (last run, today's counters) in `~/.social-agents/state/engagement-state.json`.
+Daily action budgets, weights, and time windows live in [`config/engagement-schedule.json`](config/engagement-schedule.json). Per-platform state (last run, today's counters) in `~/.social-skills/state/engagement-state.json`.
 
 ## Cron — installed automation
 
@@ -112,7 +114,7 @@ Both wrappers invoke `claude --print --dangerously-skip-permissions "/<skill>"` 
 
 | Script | What |
 |---|---|
-| `scripts/launch_browser.sh` | Boots the persistent shared Chrome against `~/.social-agents/chrome-profile/` with the anti-detection flag. |
+| `scripts/launch_browser.sh` | Boots the persistent shared Chrome against `~/.social-skills/chrome-profile/` with the anti-detection flag. |
 | `scripts/jitter.sh MIN MAX` | Random delay generator — used between every browser action. |
 | `scripts/pad_ios_screenshot.sh <input> [output] [mode]` | Pads tall iPhone screenshots to 4:5. Plain modes: `edge` (seamless sample), `blur` (Apple-style frame), `random` (palette), `#RRGGBB` (solid). Fancy modes (random gradient bg + SVG decoration layer — sparkles, stars, hearts, golden crosses, mini-Bibles, doves, scripture words, glow orbs): `gradient`, `bloom`, `sparkle`, `cosmic`, `divine`, `holy`, `lovely`, `dream`. Smart: `surprise` picks a fancy mode at random. |
 | `scripts/daily_devotional.sh` · `scripts/warm_all_cron.sh` | Cron entrypoints — `cd` into the repo, restore `PATH`, run Claude headless. |
@@ -121,17 +123,17 @@ Both wrappers invoke `claude --print --dangerously-skip-permissions "/<skill>"` 
 
 | Log | Source |
 |---|---|
-| `~/.social-agents/logs/cron/<date>.log` | Daily devotional cron (shell + headless Claude stdout) |
-| `~/.social-agents/logs/cron/warm-<date>.log` | Warm cron |
-| `~/.social-agents/logs/login/<platform>-<account>-<ts>.json` | Per-login form-field discovery (the breadcrumb that makes UI changes easy to chase) |
-| `~/.social-agents/logs/post/<platform>-<account>-<ts>.json` | Per-post outcome + verification screenshot path |
-| `~/.social-agents/logs/warm/<platform>-<account>-<ts>.json` | Per-warm-pass actions executed |
+| `~/.social-skills/logs/cron/<date>.log` | Daily devotional cron (shell + headless Claude stdout) |
+| `~/.social-skills/logs/cron/warm-<date>.log` | Warm cron |
+| `~/.social-skills/logs/login/<platform>-<account>-<ts>.json` | Per-login form-field discovery (the breadcrumb that makes UI changes easy to chase) |
+| `~/.social-skills/logs/post/<platform>-<account>-<ts>.json` | Per-post outcome + verification screenshot path |
+| `~/.social-skills/logs/warm/<platform>-<account>-<ts>.json` | Per-warm-pass actions executed |
 | `~/.config/agent-browser/<platform>-<account>.json` | Saved browser session (cookies, localStorage, etc.) |
 
 ## Layout
 
 ```
-social-agents/
+social-skills/
 ├── README.md
 ├── CLAUDE.md                  ← agent context (read this if you're a fresh Claude session)
 ├── .env.example

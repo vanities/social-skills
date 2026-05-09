@@ -13,7 +13,7 @@ The intent is **one platform per `/warm-all` invocation**, not all three back-to
 
 ```bash
 CFG=config/engagement-schedule.json
-STATE=~/.social-agents/state/engagement-state.json
+STATE=~/.social-skills/state/engagement-state.json
 test -f "$CFG" && test -f "$STATE" || { echo "MISSING config or state"; exit 1; }
 
 NOW_TS=$(date -u +%s)
@@ -95,9 +95,9 @@ One line: "ran /<platform>-warm; <N> actions executed; next eligible after <time
 Add to crontab three staggered times within the active window:
 
 ```cron
-17 9   * * * /bin/bash -lc 'cd /Users/vanities/git/work/me/social-agents && claude --print "/warm-all"' >> ~/.social-agents/logs/cron-warm.log 2>&1
-43 13  * * * /bin/bash -lc 'cd /Users/vanities/git/work/me/social-agents && claude --print "/warm-all"' >> ~/.social-agents/logs/cron-warm.log 2>&1
-22 18  * * * /bin/bash -lc 'cd /Users/vanities/git/work/me/social-agents && claude --print "/warm-all"' >> ~/.social-agents/logs/cron-warm.log 2>&1
+17 9   * * * /bin/bash -lc 'cd /Users/vanities/git/work/me/social-skills && claude --print "/warm-all"' >> ~/.social-skills/logs/cron-warm.log 2>&1
+43 13  * * * /bin/bash -lc 'cd /Users/vanities/git/work/me/social-skills && claude --print "/warm-all"' >> ~/.social-skills/logs/cron-warm.log 2>&1
+22 18  * * * /bin/bash -lc 'cd /Users/vanities/git/work/me/social-skills && claude --print "/warm-all"' >> ~/.social-skills/logs/cron-warm.log 2>&1
 ```
 
 (Slightly off-the-hour minutes intentionally — :17, :43, :22 — don't fire at exact times. The skill itself does additional intra-run jitter.)

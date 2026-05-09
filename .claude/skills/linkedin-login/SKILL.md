@@ -8,7 +8,7 @@ allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bas
 # LinkedIn login
 
 State path (backup): `~/.config/agent-browser/linkedin-default.json`
-Log path:           `~/.social-agents/logs/login/linkedin-default-<timestamp>.json`
+Log path:           `~/.social-skills/logs/login/linkedin-default-<timestamp>.json`
 Reference:          `docs/platforms/linkedin.md`.
 
 `.env` uses unsplit `LINKEDIN_USERNAME` / `LINKEDIN_PASSWORD` (single LinkedIn account; no per-label split unlike Instagram).
@@ -78,13 +78,13 @@ Expected: `linkedin.com/feed/`. Anything else → write log with `outcome: faile
 ## Save state
 
 ```!
-mkdir -p ~/.config/agent-browser ~/.social-agents/logs/login
+mkdir -p ~/.config/agent-browser ~/.social-skills/logs/login
 agent-browser state save ~/.config/agent-browser/linkedin-default.json
 ```
 
 ## Write the run log
 
-Use the `Write` tool to create `~/.social-agents/logs/login/linkedin-default-<timestamp>.json`:
+Use the `Write` tool to create `~/.social-skills/logs/login/linkedin-default-<timestamp>.json`:
 
 ```json
 {

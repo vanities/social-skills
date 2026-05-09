@@ -8,7 +8,7 @@ allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bas
 # Pinterest login
 
 State path (backup): `~/.config/agent-browser/pinterest-default.json`
-Log path:           `~/.social-agents/logs/login/pinterest-default-<timestamp>.json`
+Log path:           `~/.social-skills/logs/login/pinterest-default-<timestamp>.json`
 
 `.env` uses unsplit `PINTEREST_USERNAME` / `PINTEREST_PASSWORD` (single account, same convention as LinkedIn / X). The username is typically the account email.
 
@@ -78,13 +78,13 @@ Expected: `pinterest.com/` (home feed). Anything else → write log with `outcom
 ## Save state
 
 ```!
-mkdir -p ~/.config/agent-browser ~/.social-agents/logs/login
+mkdir -p ~/.config/agent-browser ~/.social-skills/logs/login
 agent-browser state save ~/.config/agent-browser/pinterest-default.json
 ```
 
 ## Write the run log
 
-Use the `Write` tool to create `~/.social-agents/logs/login/pinterest-default-<timestamp>.json`:
+Use the `Write` tool to create `~/.social-skills/logs/login/pinterest-default-<timestamp>.json`:
 
 ```json
 {

@@ -108,7 +108,7 @@ agent-browser wait 5000
 
 ### Step 7: Verify + run log
 
-After submission, capture the new post URL (Reddit redirects to `/r/<sub>/comments/<id>/<slug>/`). Save to `~/.social-agents/logs/post/reddit-default-<ts>.json`. **Manually check the post in the next few hours** — Reddit can shadow-remove it (visible only to you) without notification.
+After submission, capture the new post URL (Reddit redirects to `/r/<sub>/comments/<id>/<slug>/`). Save to `~/.social-skills/logs/post/reddit-default-<ts>.json`. **Manually check the post in the next few hours** — Reddit can shadow-remove it (visible only to you) without notification.
 
 ## Failure modes specific to Reddit
 

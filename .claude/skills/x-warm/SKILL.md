@@ -1,6 +1,6 @@
 ---
 name: x-warm
-description: Run a single warming pass on X (@swift_bible) — scroll the home feed, like 1-3 tweets, optionally repost one. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-agents/state/engagement-state.json. Use when the user says "warm x", "engage on x", or runs /x-warm. Also called by /warm-all on a schedule.
+description: Run a single warming pass on X (@swift_bible) — scroll the home feed, like 1-3 tweets, optionally repost one. Reads cadence from config/engagement-schedule.json and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm x", "engage on x", or runs /x-warm. Also called by /warm-all on a schedule.
 disable-model-invocation: true
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
@@ -13,7 +13,7 @@ Single run targeting `@swift_bible`. **Skip auto-comments** — they're the high
 
 ```bash
 CFG=config/engagement-schedule.json
-STATE=~/.social-agents/state/engagement-state.json
+STATE=~/.social-skills/state/engagement-state.json
 test -f "$CFG" && test -f "$STATE" || { echo "MISSING config or state"; exit 1; }
 
 ENABLED=$(jq -r '.platforms.x.enabled' "$CFG")
@@ -185,7 +185,7 @@ LIKE_REF="@$(echo "$PICK" | cut -d: -f1)"
 
 ## Step 6: Run log
 
-After all actions, write `~/.social-agents/logs/warm/x-default-<timestamp>.json`:
+After all actions, write `~/.social-skills/logs/warm/x-default-<timestamp>.json`:
 
 ```json
 {

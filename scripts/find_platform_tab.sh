@@ -23,7 +23,7 @@
 set -euo pipefail
 
 NEEDLE="${1:?usage: $0 <url-substring>}"
-PROFILE="${SOCIAL_AGENTS_CHROME_PROFILE:-$HOME/.social-agents/chrome-profile}"
+PROFILE="${SOCIAL_SKILLS_CHROME_PROFILE:-$HOME/.social-skills/chrome-profile}"
 PROFILE="${PROFILE/#\~/$HOME}"
 
 PORT=$(head -1 "$PROFILE/DevToolsActivePort" 2>/dev/null || echo "")

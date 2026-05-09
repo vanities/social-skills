@@ -19,7 +19,7 @@
       "Skip any target whose visible text matches a reply-prompt pattern: /reply with/i, /comment .{1,15} below/i, /type [\"']?[A-Za-z]{2,12}[\"']?/i, /say .{1,20} below/i. These posts expect a specific keyword (often 'amen' or a verse reference) and a generic corpus phrase will look obviously off. Set 2026-05-05 after our first X test landed 'blessed' on a tweet whose image said 'reply with amen' — the user had to delete the reply manually.",
       "Lean on captions/alt-text for image-based prompts when available — a fully-image-driven prompt won't surface in tweetText. If alt-text isn't accessible, prefer to skip rather than guess."
     ],
-    "track_used": "When a comment is posted, append the phrase + platform + target post id + timestamp to ~/.social-agents/state/comment-history.json so the de-dup checks above can run."
+    "track_used": "When a comment is posted, append the phrase + platform + target post id + timestamp to ~/.social-skills/state/comment-history.json so the de-dup checks above can run."
   },
   "categories": {
     "universal": [
