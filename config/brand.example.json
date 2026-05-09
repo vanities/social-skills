@@ -7,6 +7,15 @@
 
   "default_brand": "main",
 
+  "essential_tabs": [
+    "https://www.instagram.com/your_handle/",
+    "https://www.linkedin.com/feed/",
+    "https://x.com/your_handle",
+    "https://www.pinterest.com/your_handle/",
+    "https://www.tiktok.com/@your_handle"
+  ],
+  "_essential_tabs_comment": "URLs that scripts/launch_browser.sh ensures are open after Chrome boots. Combined with Chrome's --restore-last-session flag (set automatically by the launch script), this means: clean restart → Chrome restores prior tabs (no-op for verifier); crash → flag forces restore (no 'Restore?' prompt to click); fresh profile / closed-by-mistake tabs → verifier adds the missing ones. Pin them in Chrome (right-click tab → Pin) for visual + accident-resistance. Note: matcher is HOST-level — if you list two URLs on the same domain (e.g. two X handles), the verifier opens only the first one when no x.com tabs exist at all; --restore-last-session handles the multi-tab case correctly when the previous session is intact.",
+
   "org": {
     "_comment": "Org-level info shared across all brands. LinkedIn company-page posts go FROM here, not from a per-brand handle (a single LinkedIn company page typically represents the parent org, not each product). If you don't have a company page or post only to your personal feed, leave linkedin_company_id null.",
     "name": "Example Org",

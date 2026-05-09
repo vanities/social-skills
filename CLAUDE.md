@@ -41,6 +41,10 @@ Start a work session:
 bash scripts/launch_browser.sh
 ```
 
+`launch_browser.sh` is **idempotent and crash-safe**:
+- Boots Chrome with `--restore-last-session` so the previous tab set replays automatically (no "Restore?" infobar to click) — including pinned tabs.
+- After Chrome settles, probes `/json/list` and verifies every URL in `essential_tabs` (config/brand.json) has a tab on its domain. Opens any missing host. Pin the platform tabs in Chrome (right-click → Pin) to make them stick across restarts AND make them visually distinct in the tab bar. Pinned tabs are also resistant to accidental close.
+
 ## Multi-brand model
 
 `config/brand.json` supports a parent **org** (LinkedIn company id, etc.) with N child **brands**, each with its own per-platform handles, topic filter, and voice. Skills resolve which brand to target via the first arg if given, else `default_brand`.
