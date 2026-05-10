@@ -1,7 +1,6 @@
 ---
 name: post-daily-content
 description: Capture today's content from an iOS simulator (or any source you wire up), draft platform-tailored captions, and fan out to your enabled platforms. Sample composite that's intended to be copied + edited per brand. Use when the user says "post today's content", "publish daily", or runs /post-daily-content.
-disable-model-invocation: true
 allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(bash *) Bash(test *) Bash(date *) Bash(ls *) Bash(cat *) Bash(jq *) Bash(mkdir *) Bash(cp *) Bash(sleep *) Read(*) Write(*) Skill(instagram-post *) Skill(x-post *) Skill(pinterest-post *) Skill(linkedin-post *) mcp__XcodeBuildMCP__tap mcp__XcodeBuildMCP__session_set_defaults mcp__XcodeBuildMCP__snapshot_ui
 ---
 

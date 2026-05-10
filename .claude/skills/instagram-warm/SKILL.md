@@ -1,7 +1,6 @@
 ---
 name: instagram-warm
 description: Run a single warming pass on Instagram — scroll the home feed, like 1-3 posts. First arg is an optional brand slug (defaults to default_brand in config/brand.json). Reads cadence from config/engagement-schedule.json, brand tunables (own handle, topic regex) from config/brand.json. Use when the user says "warm instagram", "engage on ig", or runs /instagram-warm. Also called by /warm-all on a schedule.
-disable-model-invocation: true
 argument-hint: [brand-slug]
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---

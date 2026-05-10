@@ -1,7 +1,6 @@
 ---
 name: linkedin-post
 description: Post a media + caption to LinkedIn. Pass `personal` to post to your own feed, or a numeric company id to post AS that company page (find your id in the page admin URL). Use when the user says "post X to linkedin" or runs /linkedin-post.
-disable-model-invocation: true
 argument-hint: [personal|<company-id>] [media-path] [caption]
 allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(ls *) Bash(grep *)
 ---
@@ -117,6 +116,17 @@ Wait for the preview to render (`agent-browser wait $(bash scripts/jitter.sh 150
 agent-browser wait $(bash scripts/jitter.sh 1500 3500) && \
 agent-browser click @<post-ref> && \
 agent-browser wait 4000
+```
+
+If after the wait the compose modal is still open (the @ref click silently no-op'd — confirmed live 2026-05-10 on X and Pinterest with the same publish-button-render-race), fall back to eval-find-button-by-text:
+
+```bash
+DIALOG=$(agent-browser eval "(()=>{const d=document.querySelector('[role=dialog]');return d?'open':'closed'})()" 2>&1 | tail -1 | tr -d '"')
+if [ "$DIALOG" != "closed" ]; then
+  echo "[li-post] Post click no-op'd — retrying via eval" >&2
+  agent-browser eval "(()=>{const post=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Post'&&!b.disabled);if(post){post.click();return 'clicked'}return 'no btn'})()"
+  agent-browser wait 4000
+fi
 ```
 
 ## Step 8b: Dismiss the post-publish upsell

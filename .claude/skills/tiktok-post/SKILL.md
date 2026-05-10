@@ -1,7 +1,6 @@
 ---
 name: tiktok-post
 description: Post to TikTok. CURRENTLY DEFERRED — TikTok's web upload is video-only; Photo Mode (image carousels) is mobile-app exclusive. This skill documents the state and the three paths forward. Read it before attempting anything TikTok-related.
-disable-model-invocation: true
 argument-hint: [media] [caption]
 allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *)
 ---

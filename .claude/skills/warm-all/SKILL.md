@@ -1,7 +1,6 @@
 ---
 name: warm-all
 description: Pick the most-stale enabled platform (by last_run_iso) and run its warm skill once. Designed to be invoked by cron 2-3 times daily; each call advances rotation. Respects per-platform daily caps and the global min-gap. Use when the user says "warm all", "engagement run", or runs /warm-all.
-disable-model-invocation: true
 allowed-tools: Bash(*) Bash(jq *) Bash(date *) Bash(test *) Read(*) Skill(x-warm *) Skill(pinterest-warm *) Skill(instagram-warm *)
 ---
 

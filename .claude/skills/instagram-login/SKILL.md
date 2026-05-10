@@ -1,7 +1,6 @@
 ---
 name: instagram-login
 description: Log into an Instagram account in the shared headed Chrome. If .env has INSTAGRAM_<ACCOUNT>_USERNAME / _PASSWORD set, signs in automatically; otherwise pauses for manual sign-in. Always logs the form fields it found so we can detect IG UI changes. Use when the user says "log in to instagram" or runs /instagram-login.
-disable-model-invocation: true
 argument-hint: [account-label]
 allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bash(grep *) Bash(cat *) Bash(source *) Read(.env)
 ---

@@ -1,7 +1,6 @@
 ---
 name: x-login
 description: Log into X (Twitter) in the shared headed Chrome. Auto-mode if .env has TWITTER_USERNAME / TWITTER_PASSWORD set; pauses for any verification challenge X throws on a new device fingerprint. Logs the form refs found. Use when the user says "log into x" / "log into twitter" or runs /x-login.
-disable-model-invocation: true
 allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bash(grep *) Bash(cat *) Bash(cut *) Read(.env)
 ---
 

@@ -1,7 +1,6 @@
 ---
 name: x-post
 description: Post a tweet or a multi-tweet thread on X (Twitter) from a specific account. First arg is the X handle (no `@`); second is a path to a JSON file describing the tweets. Each entry has `text` (≤280 chars) and optional `media` (1–4 image paths). Use when the user says "post to X", "tweet this", or runs /x-post.
-disable-model-invocation: true
 argument-hint: [account] [thread-json]
 allowed-tools: Bash(agent-browser *) Bash(bash *) Bash(test *) Bash(date *) Bash(grep *) Bash(jq *) Bash(cat *) Bash(mkdir *) Read(*)
 ---
@@ -103,8 +102,24 @@ agent-browser wait $(bash scripts/jitter.sh 600 1300)
 If `MEDIA0` is non-empty, upload (the **first** input supports `multiple=true` for up to 4 images in a single tweet, OR exactly 1 video):
 
 ```bash
-agent-browser upload "input[type=file]" $MEDIA0
+# Use the testid selector — `input[type=file]` matches TWO file inputs in
+# this DOM (one in the modal, one stale on x.com/home), and the upload may
+# silently set the file on the stale one. Confirmed live 2026-05-10: image
+# never attached when targeting `input[type=file]`; switching to the testid
+# selector fixed it. Both candidates have data-testid=fileInput, but
+# Playwright/`setInputFiles` consistently picks the active modal one when
+# this selector is used.
+agent-browser upload "input[data-testid=fileInput]" $MEDIA0
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+
+# VERIFY the attachment preview rendered before continuing — if upload silently
+# failed, attachment preview won't be there and the post will go up text-only.
+HAS_MEDIA=$(agent-browser eval "(()=>{const dialog=document.querySelector('[role=dialog]')||document;const blob=Array.from(dialog.querySelectorAll('img')).find(i=>i.src.startsWith('blob:'));return blob?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
+if [ "$HAS_MEDIA" != "yes" ]; then
+  echo "[x-post] media upload didn't attach — retrying once" >&2
+  agent-browser upload "input[data-testid=fileInput]" $MEDIA0
+  agent-browser wait $(bash scripts/jitter.sh 1500 3000)
+fi
 ```
 
 **For video uploads, wait for processing to complete before clicking Post.** X's compose modal exposes upload status via `[data-testid=attachments]` ("Processing 50%" → "Uploaded (100%)"); the Post button stays disabled until processing finishes. Poll:
@@ -121,12 +136,22 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
 done
 ```
 
-**Re-snapshot immediately before clicking Post** — refs shift after upload AND clicking a stale Post button silently no-ops. The freshest ref is the one to click.
+**Click Post via its `data-testid`, NOT via @ref.** Refs shift after upload, AND even a freshly-snapshotted `@<POST_BUTTON_REF>` can silently no-op (confirmed live 2026-05-10: clicked the just-snapshotted ref, URL stayed at `x.com/compose/post`; clicking via `[data-testid=tweetButton]` worked first try). The testid is stable across renders.
 
 ```bash
 agent-browser wait $(bash scripts/jitter.sh 1500 3500)
-agent-browser click "@<POST_BUTTON_REF>"
+agent-browser eval "document.querySelector('[data-testid=tweetButton]:not([disabled])').click()"
 agent-browser wait 5000
+
+# Verify the modal closed (URL flipped off /compose/post). If we're still
+# there, click again — the click can race with React state finishing the
+# media-attachment commit on slow runs.
+URL=$(agent-browser get url 2>&1 | tail -1)
+if echo "$URL" | grep -q '/compose/post'; then
+  echo "[x-post] Post click no-op'd — retrying" >&2
+  agent-browser eval "document.querySelector('[data-testid=tweetButton]:not([disabled])').click()"
+  agent-browser wait 5000
+fi
 ```
 
 After the post, a "Your post was sent. View" toast appears. X may also surface a graduated-access modal ("Unlock more on X") on new accounts — dismiss it with the **"Got it"** button.

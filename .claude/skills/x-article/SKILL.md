@@ -1,7 +1,6 @@
 ---
 name: x-article
 description: Draft a long-form X Article (formatted essay with headings, bold, lists, images) and write it to articles/<slug>.md as a paste-ready file. Does NOT auto-publish — the X composer's rich-text editor races with keyboard typing on markdown shortcuts and contextually hides toolbar buttons, so reliable auto-fill is impractical. The user pastes paragraph-by-paragraph into x.com/compose/articles, applying the toolbar buttons by hand. Use when the user says "draft an X article", "write a long-form post for X", or runs /x-article.
-disable-model-invocation: true
 argument-hint: [account] [slug] [source]
 allowed-tools: Bash(*) Read(*) Write(*) Edit(*) Glob(*) Grep(*)
 ---

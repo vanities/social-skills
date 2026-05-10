@@ -1,7 +1,6 @@
 ---
 name: reddit-post
 description: Post to a single subreddit. STUB — Reddit fundamentally breaks the cross-post / cron / warm patterns the other skills assume; this file documents why and what shape the skill should take when actually used. Read it before attempting anything Reddit-related. Use when the user says "post to reddit", "submit to r/<sub>", or runs /reddit-post.
-disable-model-invocation: true
 argument-hint: [subreddit] [title] [body-or-url]
 allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash(mkdir *) Read(*) Write(*)
 ---

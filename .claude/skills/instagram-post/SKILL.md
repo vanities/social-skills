@@ -1,7 +1,6 @@
 ---
 name: instagram-post
 description: Post a media file to Instagram with a caption. Operates against the shared headed Chrome — finds the existing Instagram tab if one is open, otherwise opens one. Use when the user says "post X to Instagram" or runs /instagram-post.
-disable-model-invocation: true
 argument-hint: [account] [media-path] [caption]
 allowed-tools: Bash(agent-browser *) Bash(test *) Bash(ls *) Bash(date *) Bash(grep *)
 ---
@@ -176,21 +175,55 @@ Confirm the active dialog is now `Create new post` before continuing.
 
 ## Step 7: Enter the caption
 
-`agent-browser snapshot -i` *does* find the caption textbox (`textbox "Write a caption..."`) — capture its `@ref`. Focus it, then **use `agent-browser keyboard type`, NOT `agent-browser type @ref`**:
+The caption textbox is `textbox "Write a caption..."` inside the `Create new post` dialog. **Capture its `@ref` from a fresh snapshot, abort if missing, and verify length after typing.** `keyboard type` into a focus that didn't take produces no caption AND can fire keystrokes into something else (e.g. it may bubble Escape-equivalent and pop a "Discard post?" dialog). Confirmed live 2026-05-10: a missing-ref typing attempt left the caption empty even after Share completed and the post landed without text.
 
 ```bash
-agent-browser focus "@<caption-ref>"
+# Re-snapshot AFTER Edit→Next finished. Lexical needs a moment to mount the
+# textbox. Don't proceed until we've confirmed the ref exists.
+CAPTION_REF=""
+for try in 1 2 3; do
+  CAPTION_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE '@e[0-9]+' | head -1)
+  [ -n "$CAPTION_REF" ] && break
+  agent-browser wait 1500
+done
+if [ -z "$CAPTION_REF" ]; then
+  echo "[ig-post] caption textbox not found after 3 snapshots — aborting" >&2
+  exit 1
+fi
+
+agent-browser focus "$CAPTION_REF"
+agent-browser wait 400
 agent-browser keyboard type "$CAPTION"   # $CAPTION can contain literal \n — keyboard type sends Enter for each newline
 agent-browser wait $(bash scripts/jitter.sh 800 1600)
+
+# If keyboard input fired into the wrong target it can pop a "Discard post?"
+# dialog. Click Cancel to recover, then re-find the caption ref and retry once.
+DISCARD=$(agent-browser eval "(()=>{const d=Array.from(document.querySelectorAll('[role=dialog],div')).find(x=>(x.textContent||'').startsWith('Discard post?'));return d?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
+if [ "$DISCARD" = "yes" ]; then
+  echo "[ig-post] Discard dialog popped — Cancelling and retrying caption" >&2
+  agent-browser eval "(()=>{const btns=Array.from(document.querySelectorAll('button'));const cancel=btns.find(b=>b.textContent.trim()==='Cancel');if(cancel)cancel.click();return 'cancelled'})()"
+  agent-browser wait 1000
+  CAPTION_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE '@e[0-9]+' | head -1)
+  agent-browser focus "$CAPTION_REF"
+  agent-browser wait 400
+  agent-browser keyboard type "$CAPTION"
+  agent-browser wait $(bash scripts/jitter.sh 800 1600)
+fi
+
+# Verify length matches what we expected. If 0, retry once before Share —
+# clicking Share with empty caption posts text-less, and IG won't let us
+# re-add a caption via /compose; only via the post's Edit info menu.
+LEN=$(agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Create new post\"]');const ca=d.querySelector('[aria-label=\"Write a caption...\"]');return ca?ca.textContent.length:0})()" 2>&1 | tail -1)
+if [ "$LEN" = "0" ] || [ -z "$LEN" ]; then
+  echo "[ig-post] caption length 0 after typing — retrying once" >&2
+  agent-browser focus "$CAPTION_REF"
+  agent-browser wait 400
+  agent-browser keyboard type "$CAPTION"
+  agent-browser wait $(bash scripts/jitter.sh 800 1600)
+fi
 ```
 
 **Why `keyboard type` and not `type @ref`**: IG's caption editor is a Lexical contenteditable div. `agent-browser type @ref "multi\nline"` swallows newlines and produces one run-on paragraph. `keyboard type` sends real Enter keystrokes, which Lexical converts to proper `<br><br>` paragraph breaks AND auto-styles `#hashtags` with the correct `class="x7l2uk3 xt0e3qv"` link spans.
-
-Verify the caption was accepted:
-
-```bash
-agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Create new post\"]');const ca=d.querySelector('[aria-label=\"Write a caption...\"]');return{len:ca.textContent.length,first80:ca.textContent.slice(0,80),last60:ca.textContent.slice(-60)}})()"
-```
 
 ## Step 8: Share
 

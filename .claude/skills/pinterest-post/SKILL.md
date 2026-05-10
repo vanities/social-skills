@@ -1,7 +1,6 @@
 ---
 name: pinterest-post
 description: Post a pin to Pinterest. Reads a JSON spec with media, title, description, board, and optional destination link. Use when the user says "post to pinterest", "pin this", or runs /pinterest-post.
-disable-model-invocation: true
 argument-hint: [pin-json]
 allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash(jq *) Bash(cat *) Bash(mkdir *) Read(*) Write(*)
 ---
@@ -148,16 +147,16 @@ agent-browser wait $(bash scripts/jitter.sh 1500 3000)
 
 **Critical**: by the time you reach this step, the form has typically grown past one viewport and the Publish button (top-right of the form) is **scrolled off-screen** at a negative y. A click on a button at `y < 0` silently no-ops (or saves a draft) — you'll see "Pin drafts" increment instead of a published toast. Always scroll it into view before clicking.
 
-```bash
-agent-browser snapshot -i 2>&1 | grep -E 'Publish.*ref' | head -1
-# Sanity check the bbox — if y is negative, scroll into view
-agent-browser eval "(()=>{const btns=document.querySelectorAll('button');const pub=Array.from(btns).find(b=>(b.textContent||'').trim()==='Publish'&&!b.disabled);const r=pub.getBoundingClientRect();return{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),disabled:pub.disabled}})()"
+**Click via `eval`-find-button-by-text, NOT `@<PUBLISH_REF>`.** Confirmed live 2026-05-10: `agent-browser click "@<PUBLISH_REF>"` (with the button visibly in viewport, not disabled, scrollintoview-d) silently saved the form as a draft instead of publishing — `Pin drafts (N+1)` incremented, no toast. Re-clicking via `agent-browser eval "...pub.click()"` published immediately. Same pattern as X's tweetButton.
 
+```bash
 agent-browser scrollintoview "@<PUBLISH_REF>"
 agent-browser wait $(bash scripts/jitter.sh 700 1300)
+# Sanity check the bbox is in viewport
+agent-browser eval "(()=>{const pub=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Publish'&&!b.disabled);if(!pub)return 'gone';const r=pub.getBoundingClientRect();return{disabled:pub.disabled,inViewport:r.y>=0&&r.y+r.height<=window.innerHeight}})()"
 
-agent-browser wait $(bash scripts/jitter.sh 1500 3500)
-agent-browser click "@<PUBLISH_REF>"
+# Publish via eval — the @ref path saves drafts even when bbox is correct.
+agent-browser eval "(()=>{const pub=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Publish'&&!b.disabled);if(pub){pub.click();return 'clicked'}return 'no btn'})()"
 agent-browser wait 8000   # publish takes 5–8s; the button text flips to "Publishing" mid-flight
 ```
 

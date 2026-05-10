@@ -1,7 +1,6 @@
 ---
 name: pinterest-login
 description: Log into Pinterest in the shared headed Chrome. Auto-mode if .env has PINTEREST_USERNAME / PINTEREST_PASSWORD set; pauses for any verification challenge Pinterest throws on a new device. Logs the form refs found. Use when the user says "log into pinterest" or runs /pinterest-login.
-disable-model-invocation: true
 allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bash(grep *) Bash(cat *) Bash(cut *) Read(.env)
 ---
 

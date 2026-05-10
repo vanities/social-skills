@@ -1,7 +1,6 @@
 ---
 name: feature-post
 description: Orchestrate a cross-platform launch post for an iOS app feature. Drives the iOS simulator to capture screenshots / video, pads them, drafts platform-tailored captions (announcement-style for LinkedIn / IG / X; search-rewritten how-to for Pinterest), gets user approval, then cross-posts to enabled platforms. First arg is the feature description; second is optional brand slug; third is comma-separated platforms (default all). Use when the user says "feature post X", "post about the new Y feature", or runs /feature-post.
-disable-model-invocation: true
 argument-hint: [feature-description] [brand-slug] [platforms]
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(xcrun simctl *) Bash(jq *) Bash(date *) Bash(mkdir *) Bash(cp *) Bash(test *) Bash(ls *) Read(*) Write(*) Skill(linkedin-post *) Skill(instagram-post *) Skill(x-post *) Skill(pinterest-post *)
 ---

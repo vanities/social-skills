@@ -1,7 +1,6 @@
 ---
 name: linkedin-login
 description: Log into LinkedIn in the shared headed Chrome. Auto-mode if .env has LINKEDIN_USERNAME / LINKEDIN_PASSWORD set; pauses for any verification PIN that LinkedIn requires on a new device fingerprint. Logs the form refs found. Use when the user says "log into linkedin" or runs /linkedin-login.
-disable-model-invocation: true
 allowed-tools: Bash(agent-browser *) Bash(mkdir *) Bash(test *) Bash(date *) Bash(grep *) Bash(cat *) Bash(cut *) Read(.env)
 ---
 

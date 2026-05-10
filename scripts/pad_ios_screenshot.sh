@@ -408,6 +408,14 @@ case "$MODE" in
     decorate_words 2 "love,grace,joy,blessed,heart,faith,beloved" "#FFFFFF" "#FFB6C1"
     svg_done
     ;;
+  mother)
+    bg_radial "#6B1F3F" "#1F0810"
+    svg_init
+    decorate_hearts 22 "#FF4081" "#E91E63" "#FFB6C1" "#FFC1CC" "#FFFFFF"
+    decorate_words 4 "mom,mama,mother,love,grace,blessed,beloved,nurturing,tender,thank you" "#FFFFFF" "#FFB6C1" "#FFD700"
+    decorate_sparkles 22 "#FFFFFF" "#FFB6C1" "#FFD700"
+    svg_done
+    ;;
   dream)
     bg_blur 70 65
     svg_init
@@ -416,7 +424,7 @@ case "$MODE" in
     svg_done
     ;;
   *)
-    echo "unknown mode: $MODE (use edge|blur|random|gradient|bloom|sparkle|cosmic|divine|holy|lovely|dream|surprise|#RRGGBB)" >&2
+    echo "unknown mode: $MODE (use edge|blur|random|gradient|bloom|sparkle|cosmic|divine|holy|lovely|mother|dream|surprise|#RRGGBB)" >&2
     exit 1
     ;;
 esac

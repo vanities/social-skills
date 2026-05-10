@@ -1,7 +1,6 @@
 ---
 name: x-warm
 description: Run a single warming pass on X — scroll the home feed, like 1-3 tweets, optionally repost one. First arg is an optional brand slug (defaults to default_brand in config/brand.json). Reads cadence from config/engagement-schedule.json, brand tunables (own handle, topic regex, parody-risk handles) from config/brand.json, and respects the daily budget + min-gap stored in ~/.social-skills/state/engagement-state.json. Use when the user says "warm x", "engage on x", or runs /x-warm. Also called by /warm-all on a schedule.
-disable-model-invocation: true
 argument-hint: [brand-slug]
 allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *) Bash(awk *) Bash(test *) Bash(mkdir *) Bash(shuf *) Bash(seq *) Read(*) Write(*)
 ---
