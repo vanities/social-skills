@@ -59,17 +59,11 @@ sleep 2
 ```bash
 DATE=$(date +%Y-%m-%d)
 RAW="/tmp/daily-content-${DATE}.png"
-PADDED="/tmp/daily-content-${DATE}-4x5.jpg"
 xcrun simctl io booted screenshot "$RAW"
-# 4:5 padding for IG feed. Modes: edge | blur | random | #RRGGBB | gradient |
-# bloom | sparkle | cosmic | divine | holy | lovely | dream | surprise.
-# `surprise` rolls one of the fancy decorated modes (great for visually-rich
-# content; subdued modes like `edge` or `blur` work for text-heavy screens).
-bash scripts/pad_ios_screenshot.sh "$RAW" "$PADDED" surprise
-ls -lh "$RAW" "$PADDED"
+ls -lh "$RAW"
 ```
 
-`$RAW` is the original tall screenshot — best for Pinterest (which prefers vertical 2:3 / taller content). `$PADDED` is 4:5 — required for IG, used for X for consistency.
+`$RAW` is the original tall screenshot — best for Pinterest (which prefers vertical 2:3 / taller content). The 4:5 padded version comes after Step 4 (after we know the theme — see Step 4b).
 
 ## Step 4: Extract today's content
 
@@ -85,6 +79,42 @@ cat > /tmp/daily-content.json <<JSON
 }
 JSON
 ```
+
+## Step 4b: Pick a padding mode that fits the theme, then pad
+
+`pad_ios_screenshot.sh` fills the side gaps when a tall iPhone screenshot is converted to 4:5 for IG. Decorated modes scatter SVG elements (hearts, crosses, sparkles, scripture words) into those gaps with a coloured gradient. **Choose deliberately based on what you extracted in Step 4 — do NOT default to `surprise` (random)**. A wrong vibe (e.g. pink hearts under content about danger or warning) reads as tone-deaf.
+
+| Content theme / mood | Mode | Look |
+|---|---|---|
+| Love, grace, family, kindness, mothers | `mother` | Rose-pink hearts + "mom/mama/love/blessed/nurturing" |
+| Fatherhood, leadership, strength, refuge, provider | `father` | Deep navy + golden crosses + "father/strong/refuge/provider/shepherd" |
+| Romance, affection, tenderness | `lovely` | Hearts + "love/grace/joy/blessed/beloved" |
+| Light, glory, praise, joy, victory | `divine` | Golden crosses + "amen/blessed/grace" |
+| Worship, devotion, sacred space | `holy` | Divine + doves + Bibles |
+| Hope, dreams, peace, rest, quiet | `dream` | Faded words over a soft blur |
+| Awe, mystery, vastness, beauty | `cosmic` | Nebula orbs + sparkle dust |
+| Wonder, celebration, sparkles | `sparkle` | Dense sparkles + light words |
+| Renewal, growth, blooming | `bloom` | Petal-like orbs + warm gradient |
+| Warning, evil, deception, judgment, darkness | `shadow` | Deep slate/black + dim crosses + cautionary words |
+| Grief, mourning, lament, sorrow, hard seasons | `lament` | Cool slate-blue + dim orbs + "comfort/restore/hear/weep" |
+| **Easter / Resurrection / cross / sacrifice** | `easter` | Sunrise gradient + golden crosses + "risen/alive/finished" |
+| **Christmas / Advent / Nativity / Star of Bethlehem** | `christmas` | Night-sky → amber gradient + stars + "noel/joy/peace/savior" |
+| **Pentecost / Holy Spirit / fire / boldness** | `pentecost` | Flame gradient + doves + "fire/spirit/breath/wind" |
+| Generic / text-heavy / when nothing fits | `gradient`, `edge`, or `blur` | Subdued, no decorations |
+
+**Calendar awareness**: prefer event modes near their dates even if the day's content doesn't lead with that theme — Easter week → `easter`, Advent (Dec 1-25) → `christmas`, Pentecost Sunday → `pentecost`.
+
+Plain modes for non-Bible brands: `edge` (seamless extension), `blur` (Apple-style blurred background), `random` (curated palette colours), or a literal `#RRGGBB` hex.
+
+```bash
+PADDED="/tmp/daily-content-${DATE}-4x5.jpg"
+# Replace <chosen-mode> with the one that fits.
+MODE=<chosen-mode>
+bash scripts/pad_ios_screenshot.sh "$RAW" "$PADDED" "$MODE"
+ls -lh "$PADDED"
+```
+
+`$PADDED` is 4:5 — required for IG, used for X for consistency.
 
 ## Step 5: Draft platform-tailored captions
 

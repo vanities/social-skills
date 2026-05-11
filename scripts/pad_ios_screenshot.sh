@@ -21,10 +21,26 @@
 #   divine      Golden gradient + Latin crosses + sparkles + a scripture word.
 #   holy        Like divine, plus a stylized Bible + flying-dove silhouettes.
 #   lovely      Pink/red gradient + hearts + sparkles + a tender word.
+#   mother      Deep-rose gradient + many hearts + "mom/mama/love/blessed" words.
+#   father      Deep navy/charcoal + golden crosses + steady amber glow +
+#               "father/papa/dad/strong/refuge/provider/shepherd" words.
 #   dream       Dimmed blur bg + faded scripture words + sparkles.
+#   shadow      Dark slate/black gradient + dim crosses + cautionary words
+#               ("beware/watch/discern/wake") — for warning / deception / judgment
+#               themed verses where the lighter modes would read tone-deaf.
+#
+# Calendar / event modes (date-driven or major liturgical event content):
+#   easter      Sunrise gradient + golden crosses + "risen/alive/finished/empty".
+#   christmas   Night-sky → warm-amber gradient + stars + "noel/joy/peace/savior".
+#   pentecost   Flame gradient + doves + "fire/spirit/breath/wind/tongues".
+#   lament      Cool slate-blue gradient + dim orbs + "comfort/restore/hear/weep"
+#               — for grief / mourning / Psalms of lament; distinct from shadow
+#               (which is for warning, not sorrow).
 #
 # Smart mode:
-#   surprise    Picks one of the fancy modes at random. Logs the pick to stderr.
+#   surprise    Picks one of the lighter fancy modes at random (excludes thematic
+#               and calendar modes — those should always be chosen by hand based
+#               on the day's content). Logs the pick to stderr.
 #
 # If the input is already 4:5 or wider, the file is copied unchanged.
 # Echoes the output path on success.
@@ -423,8 +439,61 @@ case "$MODE" in
     decorate_sparkles 28 "#FFFFFF" "#FFFAE0"
     svg_done
     ;;
+  shadow)
+    bg_radial "#1B1F2A" "#05060A"
+    svg_init
+    decorate_crosses 5 "#3A3F50" "#2A2F3E" "#4A4F60"
+    decorate_words 3 "beware,watch,discern,wake,guard,test,prove,sober" "#6A7080" "#8A90A0"
+    decorate_sparkles 8 "#3A3F50" "#5A6070"
+    svg_done
+    ;;
+  father)
+    bg_radial "#1A2540" "#070C1A"
+    svg_init
+    decorate_crosses 8 "#C9A14A" "#E0B85A" "#A88838"
+    decorate_orbs 2 "#C9A14A"
+    decorate_words 3 "father,papa,dad,strong,refuge,provider,shepherd,steady,protector" "#E0B85A" "#F5DEB3"
+    decorate_sparkles 12 "#C9A14A" "#FFD700" "#F5DEB3"
+    svg_done
+    ;;
+  easter)
+    bg_radial "#FFD08C" "#5A1432"
+    svg_init
+    decorate_crosses 9 "#FFD700" "#FFA94D" "#F5E5B5"
+    decorate_sparkles 30 "#FFFFFF" "#FFD700" "#FFE8B5"
+    decorate_orbs 2 "#FFD700"
+    decorate_words 3 "risen,alive,finished,empty,hallelujah,victory,life,hope" "#FFFFFF" "#FFD700"
+    svg_done
+    ;;
+  christmas)
+    bg_radial "#FFD86B" "#0A1738"
+    svg_init
+    decorate_stars 14 "#FFD86B" "#FFFFFF" "#C9DEFF"
+    decorate_sparkles 22 "#FFFFFF" "#FFD86B" "#C9DEFF"
+    decorate_orbs 1 "#FFD86B"
+    decorate_words 3 "noel,joy,peace,savior,emmanuel,bethlehem,gloria,silent,holy night" "#FFD86B" "#FFFFFF" "#C9DEFF"
+    svg_done
+    ;;
+  pentecost)
+    bg_radial "#FF6B1A" "#2A0808"
+    svg_init
+    decorate_birds 3 "#FFFFFF" "#FFE8B5"
+    decorate_sparkles 35 "#FFD700" "#FF8A3C" "#FFFFFF"
+    decorate_orbs 2 "#FF8A3C"
+    decorate_words 3 "fire,spirit,breath,wind,tongues,advocate,power,boldness,acts" "#FFFFFF" "#FFD700"
+    svg_done
+    ;;
+  lament)
+    bg_radial "#3A4A60" "#0F1825"
+    svg_init
+    decorate_orbs 2 "#5A7090"
+    decorate_sparkles 16 "#5A7090" "#7A90B0" "#9AB0D0"
+    decorate_crosses 3 "#4A5A70" "#3A4A60"
+    decorate_words 4 "comfort,restore,hear,weep,morning,refuge,sorrow,patient,lift" "#9AB0D0" "#C0D0E5"
+    svg_done
+    ;;
   *)
-    echo "unknown mode: $MODE (use edge|blur|random|gradient|bloom|sparkle|cosmic|divine|holy|lovely|mother|dream|surprise|#RRGGBB)" >&2
+    echo "unknown mode: $MODE (use edge|blur|random|gradient|bloom|sparkle|cosmic|divine|holy|lovely|mother|father|dream|shadow|easter|christmas|pentecost|lament|surprise|#RRGGBB)" >&2
     exit 1
     ;;
 esac
