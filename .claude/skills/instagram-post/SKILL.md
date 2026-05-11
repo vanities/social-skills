@@ -175,14 +175,16 @@ Confirm the active dialog is now `Create new post` before continuing.
 
 ## Step 7: Enter the caption
 
-The caption textbox is `textbox "Write a caption..."` inside the `Create new post` dialog. **Capture its `@ref` from a fresh snapshot, abort if missing, and verify length after typing.** `keyboard type` into a focus that didn't take produces no caption AND can fire keystrokes into something else (e.g. it may bubble Escape-equivalent and pop a "Discard post?" dialog). Confirmed live 2026-05-10: a missing-ref typing attempt left the caption empty even after Share completed and the post landed without text.
+The caption textbox is `textbox "Write a caption..."` inside the `Create new post` dialog. **Capture its ref correctly, abort if missing, verify length AND Lexical commit-state after typing, then blur to force Lexical to flush.** `keyboard type` into a focus that didn't take produces no caption AND fires keystrokes into something else (it pops a "Discard post?" dialog). Confirmed live 2026-05-10 and 2026-05-11.
+
+**Critical grep gotcha**: `agent-browser snapshot -i` outputs refs as `[ref=e15]`, NOT `@e15`. The `@e15` form is what we PASS to `agent-browser focus/click`. Many people (and earlier versions of this skill) wrote `grep -oE '@e[0-9]+'` which never matches anything in the snapshot — the script then focuses on an empty ref, typing bubbles, Discard pops. Use `ref=e[0-9]+` then prefix with `@`.
 
 ```bash
 # Re-snapshot AFTER Edit→Next finished. Lexical needs a moment to mount the
 # textbox. Don't proceed until we've confirmed the ref exists.
 CAPTION_REF=""
 for try in 1 2 3; do
-  CAPTION_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE '@e[0-9]+' | head -1)
+  CAPTION_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
   [ -n "$CAPTION_REF" ] && break
   agent-browser wait 1500
 done
@@ -196,31 +198,46 @@ agent-browser wait 400
 agent-browser keyboard type "$CAPTION"   # $CAPTION can contain literal \n — keyboard type sends Enter for each newline
 agent-browser wait $(bash scripts/jitter.sh 800 1600)
 
-# If keyboard input fired into the wrong target it can pop a "Discard post?"
+# If keyboard input fired into the wrong target it pops a "Discard post?"
 # dialog. Click Cancel to recover, then re-find the caption ref and retry once.
 DISCARD=$(agent-browser eval "(()=>{const d=Array.from(document.querySelectorAll('[role=dialog],div')).find(x=>(x.textContent||'').startsWith('Discard post?'));return d?'yes':'no'})()" 2>&1 | tail -1 | tr -d '"')
 if [ "$DISCARD" = "yes" ]; then
   echo "[ig-post] Discard dialog popped — Cancelling and retrying caption" >&2
   agent-browser eval "(()=>{const btns=Array.from(document.querySelectorAll('button'));const cancel=btns.find(b=>b.textContent.trim()==='Cancel');if(cancel)cancel.click();return 'cancelled'})()"
   agent-browser wait 1000
-  CAPTION_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE '@e[0-9]+' | head -1)
+  CAPTION_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
   agent-browser focus "$CAPTION_REF"
   agent-browser wait 400
   agent-browser keyboard type "$CAPTION"
   agent-browser wait $(bash scripts/jitter.sh 800 1600)
 fi
 
-# Verify length matches what we expected. If 0, retry once before Share —
-# clicking Share with empty caption posts text-less, and IG won't let us
-# re-add a caption via /compose; only via the post's Edit info menu.
-LEN=$(agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Create new post\"]');const ca=d.querySelector('[aria-label=\"Write a caption...\"]');return ca?ca.textContent.length:0})()" 2>&1 | tail -1)
-if [ "$LEN" = "0" ] || [ -z "$LEN" ]; then
-  echo "[ig-post] caption length 0 after typing — retrying once" >&2
+# Verify length AND Lexical commit-state. textContent showing the typed text
+# is NOT sufficient — Lexical's editorState may not have committed yet, and
+# Share will publish the post without the caption text. Confirmed live
+# 2026-05-11 cron: textContent.length was 639 chars at Share time, but the
+# server-side post had no caption. Check data-lexical-text spans to confirm
+# Lexical's internal model has the text.
+COMMIT=$(agent-browser eval "(()=>{const ca=document.querySelector('[role=dialog][aria-label=\"Create new post\"]')?.querySelector('[aria-label=\"Write a caption...\"]');if(!ca)return{found:false};return{textLen:ca.textContent.length,lexicalSpans:ca.querySelectorAll('[data-lexical-text]').length}})()" 2>&1 | tail -10)
+echo "$COMMIT"
+
+LEN=$(echo "$COMMIT" | grep -oE '"textLen": [0-9]+' | grep -oE '[0-9]+')
+SPANS=$(echo "$COMMIT" | grep -oE '"lexicalSpans": [0-9]+' | grep -oE '[0-9]+')
+if [ -z "$LEN" ] || [ "$LEN" = "0" ] || [ -z "$SPANS" ] || [ "$SPANS" = "0" ]; then
+  echo "[ig-post] caption not committed to Lexical (len=$LEN spans=$SPANS) — retrying" >&2
   agent-browser focus "$CAPTION_REF"
   agent-browser wait 400
   agent-browser keyboard type "$CAPTION"
   agent-browser wait $(bash scripts/jitter.sh 800 1600)
 fi
+
+# Force Lexical to flush its editorState to data-lexical-text spans BEFORE
+# Share. Lexical commits on blur. Without this step, Share can fire while
+# the typed text is still in Lexical's in-memory buffer and never reaches
+# the post payload — the post lands captionless even though textContent
+# read 639 chars a moment earlier. Confirmed live 2026-05-11.
+agent-browser eval "(()=>{const ca=document.querySelector('[role=dialog][aria-label=\"Create new post\"]')?.querySelector('[aria-label=\"Write a caption...\"]');if(ca)ca.blur();return 'blurred'})()"
+agent-browser wait 800
 ```
 
 **Why `keyboard type` and not `type @ref`**: IG's caption editor is a Lexical contenteditable div. `agent-browser type @ref "multi\nline"` swallows newlines and produces one run-on paragraph. `keyboard type` sends real Enter keystrokes, which Lexical converts to proper `<br><br>` paragraph breaks AND auto-styles `#hashtags` with the correct `class="x7l2uk3 xt0e3qv"` link spans.
@@ -246,6 +263,54 @@ done
 
 # Dismiss the success dialog
 agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-label=\"Post shared\"]');d.querySelector('[role=button]').click();return 'done'})()"
+```
+
+## Step 8b: Post-publish caption verification + Edit recovery
+
+Even with the Step 7 blur-to-flush, Lexical commit can still desync under load. Verify the live post received the caption; if not, recover via the post's Edit info dialog (which persists reliably — proven 2026-05-10 + 2026-05-11).
+
+```bash
+agent-browser open "https://www.instagram.com/$0/"
+agent-browser wait --load networkidle
+agent-browser wait 2000
+LATEST=$(agent-browser eval "(()=>{const a=document.querySelectorAll('a[href*=\"/p/\"]');return a[0]?a[0].getAttribute('href'):''})()" 2>&1 | tail -1 | tr -d '"')
+[ -z "$LATEST" ] && { echo "[ig-post] no recent post link found — manual check needed" >&2; exit 0; }
+
+agent-browser open "https://www.instagram.com${LATEST}"
+agent-browser wait --load networkidle
+agent-browser wait 2000
+
+CAPTION_HEAD=$(echo "$CAPTION" | head -c 40 | tr -d '"')
+LIVE=$(agent-browser eval "(()=>{const main=document.querySelector('main');return main?main.textContent:''})()" 2>&1 | tail -1 | tr -d '"')
+
+if ! echo "$LIVE" | grep -qF "$CAPTION_HEAD"; then
+  echo "[ig-post] live post is missing the caption — recovering via Edit dialog" >&2
+
+  # Open More options → Edit
+  MORE_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'More options' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
+  agent-browser click "$MORE_REF"
+  agent-browser wait $(bash scripts/jitter.sh 600 1100)
+  EDIT_REF=$(agent-browser snapshot -i 2>&1 | grep -E '^\s*-?\s*button "Edit"' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
+  agent-browser click "$EDIT_REF"
+  agent-browser wait $(bash scripts/jitter.sh 1200 2000)
+
+  # Type caption into Edit dialog's caption box (same Lexical editor)
+  EDIT_CAP_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Write a caption' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
+  agent-browser focus "$EDIT_CAP_REF"
+  agent-browser wait 400
+  agent-browser keyboard type "$CAPTION"
+  agent-browser wait $(bash scripts/jitter.sh 800 1500)
+
+  # Blur to force Lexical commit before clicking Done
+  agent-browser eval "(()=>{const ca=document.querySelector('[role=dialog][aria-label=\"Edit info\"]')?.querySelector('[aria-label=\"Write a caption...\"]');if(ca)ca.blur();return 'blurred'})()"
+  agent-browser wait 600
+
+  # Click Done
+  DONE_REF=$(agent-browser snapshot -i 2>&1 | grep -E '^\s*-?\s*button "Done"' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
+  agent-browser click "$DONE_REF"
+  agent-browser wait 4000
+  echo "[ig-post] caption recovered via Edit info dialog" >&2
+fi
 ```
 
 ## Step 9: Verify and write the run log
