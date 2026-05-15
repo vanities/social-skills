@@ -26,7 +26,7 @@
     "main": {
       "_comment": "Each brand under your org. The slug ('main', 'project_a', 'side_app') is what skills accept as their first arg. Add more sibling keys for additional brands.",
       "instagram": {
-        "_comment": "default_account is the label passed to /instagram-post and used as the .env credential prefix (INSTAGRAM_<UPPERCASE_LABEL>_USERNAME). own_handle is YOUR account handle as it appears on IG (no @) — used by /instagram-warm to skip your own posts in the feed.",
+        "_comment": "default_account is the label passed to /instagram-post and used as the .env credential prefix (INSTAGRAM_<UPPERCASE_LABEL>_USERNAME). own_handle is YOUR account handle as it appears on IG (no @) — used by /instagram-warm to skip your own posts in the feed AND by /instagram-post's post-publish verification step to build the correct profile URL. Set own_handle ONLY when it differs from default_account (e.g. label 'swiftbible' but actual IG handle '@swift_bible' with underscore). When unset or equal, default_account is used as the URL slug.",
         "default_account": "myaccount",
         "own_handle": "my_account_handle"
       },

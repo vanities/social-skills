@@ -23,10 +23,27 @@ BRAND_NAME=$(jq -r '.brand.name' "$BRAND")
 BRAND_URL=$(jq -r '.brand.url' "$BRAND")
 ```
 
-## Step 1: Verify simulator booted (if your flow drives an iOS app)
+## Step 1: Resolve target simulator UDID (if your flow drives an iOS app)
+
+Pin to a specific UDID instead of `booted` — when multiple sims are booted (Xcode often leaves duplicates alive after device-pane changes), `simctl ... booted` errors with ambiguity and silently hangs the skill. Edit the preference list below to match the sims you actually use; `xcrun simctl list devices` shows what's available.
+
+Uses `grep`/`sed` regex extraction rather than `awk -v var=$NAME` — the harness's `!`-block bash exec drops shell vars before they reach awk's `-v` flag (the var arrives empty), so the awk-based version silently fell through to the fallback branch.
 
 ```!
-xcrun simctl list devices | grep -q '(Booted)' && echo "ok" || echo "NO BOOTED SIMULATOR — abort"
+SIM_UDID=""
+BOOTED=$(xcrun simctl list devices | grep "(Booted)" || true)
+for NAME in "iPhone 17 Pro" "iPhone 17"; do
+  LINE=$(echo "$BOOTED" | grep -E "^[[:space:]]+${NAME} \(" | head -1)
+  if [ -n "$LINE" ]; then
+    SIM_UDID=$(echo "$LINE" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -1)
+    [ -n "$SIM_UDID" ] && { echo "Resolved: $NAME ($SIM_UDID)"; break; }
+  fi
+done
+if [ -z "$SIM_UDID" ]; then
+  SIM_UDID=$(echo "$BOOTED" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -1)
+  [ -n "$SIM_UDID" ] && echo "Fallback (first booted): $SIM_UDID"
+fi
+[ -n "$SIM_UDID" ] || { echo "NO BOOTED SIMULATOR — abort"; exit 1; }
 ```
 
 If your daily content comes from somewhere else (RSS, a CMS, a static file, an LLM-generated draft, etc.), replace this whole block.
@@ -36,14 +53,14 @@ If your daily content comes from somewhere else (RSS, a CMS, a static file, an L
 Replace `com.example.yourapp` with your bundle identifier and update the tap targets for your app's UI. SwiftUI tab bars usually expose `Tab Bar` group with empty `children` — fall back to coordinate taps.
 
 ```bash
-xcrun simctl launch booted com.example.yourapp
+xcrun simctl launch "$SIM_UDID" com.example.yourapp
 sleep 3   # SpringBoard handoff + first-frame render
 ```
 
 Probe + dismiss any onboarding / donation modal that might be in the way:
 
 ```
-mcp__XcodeBuildMCP__session_set_defaults({simulatorId: "<booted-udid>"})
+mcp__XcodeBuildMCP__session_set_defaults({simulatorId: "<value of $SIM_UDID printed by Step 1>"})
 mcp__XcodeBuildMCP__tap({label: "Not now"})   # safe to call; errors silently if absent
 ```
 
@@ -59,7 +76,7 @@ sleep 2
 ```bash
 DATE=$(date +%Y-%m-%d)
 RAW="/tmp/daily-content-${DATE}.png"
-xcrun simctl io booted screenshot "$RAW"
+xcrun simctl io "$SIM_UDID" screenshot "$RAW"
 ls -lh "$RAW"
 ```
 

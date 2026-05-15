@@ -119,10 +119,33 @@ The `Choose a board` button opens a dropdown. Click, then either:
 - Click the existing board by name, or
 - Click "Create board", type the board name, click Create
 
+**Critical**: re-snapshot RIGHT before clicking the board button — refs shift after every field fill (title / description / link), and the board-button ref captured pre-fill silently no-ops or, worse, triggers Pinterest's **drafts sidebar** which then hijacks the form with another saved draft. Confirmed live 2026-05-15: clicked a stale board ref, drafts sidebar opened, an unrelated "Acts 1:9" draft was auto-loaded into the form on top of the just-typed Lamentations content. Recovery is expensive (reload pin-creation-tool, re-upload, re-fill).
+
 ```bash
 BOARD=$(jq -r '.board' "$1")
-agent-browser click @<BOARD_BUTTON>
-agent-browser wait $(bash scripts/jitter.sh 600 1200)
+# Pause briefly so Pinterest's auto-save commits before we change focus —
+# clicking during an in-flight auto-save is one of the ways the drafts
+# sidebar opens instead of the board dropdown.
+agent-browser wait $(bash scripts/jitter.sh 800 1500)
+# Re-snapshot to get the LIVE board-button ref (NOT the one captured post-upload)
+BOARD_BTN_REF=""
+for try in 1 2 3; do
+  BOARD_BTN_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Open dropdown' | grep -iE 'board|choose' | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+  [ -n "$BOARD_BTN_REF" ] && break
+  agent-browser wait 800
+done
+[ -n "$BOARD_BTN_REF" ] || { echo "[pinterest-post] board button ref not found after 3 snapshots" >&2; exit 1; }
+agent-browser click "$BOARD_BTN_REF"
+agent-browser wait $(bash scripts/jitter.sh 700 1300)
+
+# Sanity check: did the board dropdown open, or did the drafts sidebar
+# hijack? The dropdown shows a 'Create board' button; the drafts sidebar
+# shows a 'Pin drafts (N)' heading at the top of the left panel.
+DROPDOWN_STATE=$(agent-browser eval "(()=>{const draft=Array.from(document.querySelectorAll('h2')).find(h=>(h.textContent||'').startsWith('Pin drafts'));const create=Array.from(document.querySelectorAll('button')).find(b=>(b.textContent||'').trim()==='Create board');return JSON.stringify({draftsSidebar:!!draft,boardDropdown:!!create})})()" 2>&1 | tail -1)
+if echo "$DROPDOWN_STATE" | grep -q '"draftsSidebar":true'; then
+  echo "[pinterest-post] click opened drafts sidebar (hijack!) — aborting, re-run /pinterest-post to retry" >&2
+  exit 1
+fi
 ```
 
 **If no matching board exists** (fresh accounts have none — only "Create board" is offered), open the create-board form and type the name. **Pinterest assigns the board-name input a real DOM id of `boardEditName`** — type via the id selector, not the snapshot @ref (the @ref click sometimes fails to focus the input properly):

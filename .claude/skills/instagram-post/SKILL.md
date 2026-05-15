@@ -21,6 +21,18 @@ test -f "$1" && echo "media ok" || echo "MEDIA MISSING at $1"
 
 If the media is missing, abort.
 
+## Step 1a: Resolve the actual IG handle (URL slug)
+
+`$0` is the **env-var label** that maps to `.env` credentials (e.g., `INSTAGRAM_SWIFTBIBLE_USERNAME`). The actual IG handle that appears in profile URLs is often different — e.g., the label `swiftbible` ↔ the handle `@swift_bible` (with underscore). Step 8b's post-publish verification needs the handle to build the right URL; using the label sends us to `instagram.com/<label>/` which is a different (or non-existent) profile.
+
+Resolve from `config/brand.json`: find the brand whose `instagram.default_account` matches `$0`, then take that brand's `instagram.own_handle`. Falls back to `$0` if brand.json isn't readable or `own_handle` isn't set.
+
+```!
+IG_HANDLE=$(jq -r --arg label "$0" '.brands | to_entries[] | select(.value.instagram.default_account == $label) | .value.instagram.own_handle // empty' config/brand.json 2>/dev/null)
+[ -z "$IG_HANDLE" ] && IG_HANDLE="$0"
+echo "IG_HANDLE=$IG_HANDLE (label=$0)"
+```
+
 ## Step 1b: Pre-pad tall iPhone media
 
 Instagram aggressively crops content that doesn't match the aspect it expects (4:5 for feed photos, 9:16 for Reels). Pad before uploading.
@@ -270,11 +282,11 @@ agent-browser eval "(()=>{const d=document.querySelector('[role=dialog][aria-lab
 Even with the Step 7 blur-to-flush, Lexical commit can still desync under load. Verify the live post received the caption; if not, recover via the post's Edit info dialog (which persists reliably — proven 2026-05-10 + 2026-05-11).
 
 ```bash
-agent-browser open "https://www.instagram.com/$0/"
+agent-browser open "https://www.instagram.com/${IG_HANDLE}/"
 agent-browser wait --load networkidle
 agent-browser wait 2000
 LATEST=$(agent-browser eval "(()=>{const a=document.querySelectorAll('a[href*=\"/p/\"]');return a[0]?a[0].getAttribute('href'):''})()" 2>&1 | tail -1 | tr -d '"')
-[ -z "$LATEST" ] && { echo "[ig-post] no recent post link found — manual check needed" >&2; exit 0; }
+[ -z "$LATEST" ] && { echo "[ig-post] no recent post link found at /${IG_HANDLE}/ — manual check needed" >&2; exit 0; }
 
 agent-browser open "https://www.instagram.com${LATEST}"
 agent-browser wait --load networkidle
