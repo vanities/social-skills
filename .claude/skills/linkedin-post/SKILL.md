@@ -51,14 +51,33 @@ agent-browser open "https://www.linkedin.com/company/$0/admin/"
 
 ## Step 4: Open the compose modal
 
-Snapshot. Find the **"+ Create"** button (sidebar) or **"Start a post"** entry — `agent-browser click @<ref>`. After click, `wait $(bash scripts/jitter.sh 700 1500)` and re-snapshot.
+**Personal-feed regression caught 2026-05-15**: the sidebar "Start a post" element is a `<div role="button">` (NOT a `<button>`). Both `agent-browser click @<ref>` (synthesized event) AND a real `mouse move/down/up` on its bbox center **failed to open the modal** — clicks acknowledged, no dialog appeared. Company-page admin pages use a real `<button>` that works as before; only personal-feed is broken.
 
-If a "Create" menu opens (event / hiring / article options), click **"Start a post"**.
+**Reliable path for both contexts: deep-link to `?shareActive=true`.**
+
+```bash
+# Try the conventional click path first; fall back to deep-link if no modal opens.
+START_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'button "Start a post"' | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+if [ -n "$START_REF" ]; then
+  agent-browser click "$START_REF"
+  agent-browser wait $(bash scripts/jitter.sh 1500 2500)
+fi
+HAS_MODAL=$(agent-browser eval "(()=>{const f=document.querySelector('iframe[src*=preload]');try{const ed=f?.contentDocument.querySelector('[aria-label=\"Text editor for creating content\"]');return ed?'open':'closed';}catch(e){return 'closed';}})()" 2>&1 | tail -1 | tr -d '"')
+
+if [ "$HAS_MODAL" != "open" ]; then
+  echo "[li-post] Start-a-post click no-op'd — using deep-link fallback" >&2
+  agent-browser open "https://www.linkedin.com/feed/?shareActive=true"
+  agent-browser wait --load networkidle
+  sleep 3
+fi
+```
+
+If a "Create" menu opens (event / hiring / article options) instead of the compose modal, click **"Start a post"** in that menu.
 
 The modal opens with:
 - Audience switcher button (text contains the page name + "Post to Anyone")
-- Text editor textbox (label `Text editor for creating content`)
-- "Add media" button
+- Text editor textbox (label `Text editor for creating content`) — **lives inside `iframe[src*=preload]`'s contentDocument**, so `snapshot -i` does NOT see it (Step 6 accesses it via iframe.contentDocument)
+- "Add media" / toolbar buttons (also in the iframe — see Step 7b for the toolbar-icon programmatic-click limitation)
 - "Post" button (disabled until content)
 
 ## Step 5: Verify audience
@@ -67,11 +86,16 @@ For company posts, verify the audience switcher reads **"<Company Name> … Post
 
 ## Step 6: Type the caption
 
+The editor lives inside `iframe[src*=preload]`'s contentDocument and is **not surfaced by `snapshot -i`** (personal feed at least, 2026-05-15). Focus via `iframe.contentDocument.querySelector` and use `agent-browser keyboard type` (preserves newlines, sends real Enter keystrokes that LinkedIn's editor converts to proper paragraph breaks):
+
 ```bash
-agent-browser click @<editor-ref> && \
-agent-browser wait $(bash scripts/jitter.sh 300 700) && \
-agent-browser type @<editor-ref> "$2" && \
+agent-browser eval "(()=>{const f=document.querySelector('iframe[src*=preload]');const ed=f.contentDocument.querySelector('[aria-label=\"Text editor for creating content\"], [contenteditable=\"true\"]');if(!ed)return 'no-editor';ed.focus();return 'focused'})()"
+agent-browser wait $(bash scripts/jitter.sh 300 700)
+agent-browser keyboard type "$2"
 agent-browser wait $(bash scripts/jitter.sh 800 1600)
+
+# Verify text landed (textContent collapses newlines so length will be slightly < source):
+agent-browser eval "(()=>{const f=document.querySelector('iframe[src*=preload]');const ed=f.contentDocument.querySelector('[aria-label=\"Text editor for creating content\"]');return JSON.stringify({len:ed?ed.textContent.length:0,tail:ed?ed.textContent.slice(-80):''})})()"
 ```
 
 ## Step 7: Add media
@@ -96,6 +120,10 @@ agent-browser wait $(bash scripts/jitter.sh 700 1500)
 ```
 
 ### 7b: Click Add media + upload
+
+**Critical personal-feed limitation (2026-05-15)**: the toolbar icons in the compose modal (image-frame / video / event / "+") are NOT reachable via `iframe.contentDocument.querySelectorAll('button')` — that query returns 0 buttons in the modal's bottom toolbar area, even though they're visible on-screen. They appear to render in a portal/layer the contentDocument access can't see. Company-page admin posts didn't hit this. Interactive mode: prompt the user to click the image-frame icon manually, then continue from the media editor. Cron / fully-automated: this leg fails — for now, /feature-post LinkedIn leg should prefer the company-page route (which uses a real `<button>` that responds to clicks).
+
+Once the user has clicked the image icon and the media editor is open: the full-screen "Upload from computer" button **is** surfaced by `snapshot -i` and `agent-browser upload @<ref>` works. From here the flow proceeds as documented below.
 
 Click the **Add media** button. A media editor opens with an "Upload from computer" entry. **The compose modal lives inside an iframe (`https://www.linkedin.com/preload/`)** — `document.querySelectorAll('input[type=file]')` against the top document returns `[]`. The reliable upload pattern is to target the visible "Upload from computer" button by its snapshot @e ref:
 
@@ -139,7 +167,45 @@ agent-browser click @<no-thanks-ref>
 agent-browser wait 1500
 ```
 
-The snapshot at this point also includes a **"View post"** link — capture its href if you want a permalink for the run log.
+The snapshot at this point also includes a **"View post"** link — capture its href for the run log AND for Step 8c.
+
+```bash
+POST_URL=$(agent-browser eval "(()=>{const a=Array.from(document.querySelectorAll('a')).find(a=>(a.textContent||'').trim()==='View post');return a?a.href:''})()" 2>&1 | tail -1 | tr -d '"')
+echo "POST_URL=$POST_URL"
+```
+
+## Step 8c (optional): First-comment URL
+
+LinkedIn's algorithm deranks post bodies that contain external URLs. The well-known workaround is to keep the body URL-free and drop the link as the **first comment** on your own post: algorithm sees engagement, humans see the link top-of-comments. Verified live 2026-05-15 on a personal-feed DocVault round-up post.
+
+Run this step when the caller wants a first-comment URL — e.g. the caption is link-free intentionally and the GitHub / app store / blog URL should be added immediately as a comment. Skip otherwise.
+
+```bash
+# URL-encode the urn colons — agent-browser's CDP open errors on raw `urn:li:share:`.
+POST_URL_ENC=$(echo "$POST_URL" | sed 's/urn:li:share:/urn%3Ali%3Ashare%3A/')
+agent-browser open "$POST_URL_ENC"
+agent-browser wait --load networkidle
+sleep 3
+
+# Click the engagement-action Comment button (opens the inline comment composer).
+COMMENT_OPEN_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'button "Comment"' | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
+agent-browser click "$COMMENT_OPEN_REF"
+agent-browser wait $(bash scripts/jitter.sh 800 1500)
+
+# The comment editor shares its aria-label with the post composer:
+# [role=textbox][aria-label="Text editor for creating content"]. Scroll it into view, focus, type.
+agent-browser eval "(()=>{const e=Array.from(document.querySelectorAll('[role=textbox]')).find(el=>el.getAttribute('aria-label')==='Text editor for creating content'&&el.offsetParent!==null);if(!e)return 'not-found';e.scrollIntoView({block:'center'});e.focus();return 'scrolled+focused'})()"
+agent-browser wait 800
+agent-browser keyboard type "$COMMENT_TEXT"
+agent-browser wait $(bash scripts/jitter.sh 800 1500)
+
+# Submit. There are TWO visible buttons with text "Comment": the engagement-action one (aria="Comment", above the editor) and the submit one (no aria, below the editor). eval-find by absence of aria-label:
+agent-browser eval "(()=>{const buttons=Array.from(document.querySelectorAll('button')).filter(b=>b.offsetParent!==null&&(b.textContent||'').trim()==='Comment');const submit=buttons.find(b=>b.getAttribute('aria-label')!=='Comment');if(!submit)return 'no-submit';submit.click();return 'clicked'})()"
+agent-browser wait 4000
+
+# Verify live
+agent-browser eval "(()=>{const live=Array.from(document.querySelectorAll('span,p,div')).find(e=>(e.textContent||'').trim()===\$COMMENT_TEXT&&e.offsetParent!==null);return JSON.stringify({foundLiveComment:!!live})})()"
+```
 
 ## Step 9: Verify and write the run log
 
