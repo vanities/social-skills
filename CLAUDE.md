@@ -11,6 +11,7 @@ Read also:
 - [`PERSONAL.md`](PERSONAL.md) — how to wire your handles, brand voice, and per-brand composite skills via the gitignored `personal/` + committed `personal.example/` pattern
 - `CLAUDE.local.md` — your private addendum with live state, account routing, and brand notes (gitignored, auto-loaded by Claude Code alongside this file). Sample shape: `CLAUDE.local.md.example`.
 - `docs/architecture.md` — shared-browser model, profile, state
+- [`docs/social-strategy.md`](docs/social-strategy.md) — **running drafting playbook** derived from X's open-source algorithm (`xai-org/x-algorithm`). Caption-drafting skills must consult this before generating copy. Refresh cadence is 4 weeks (matching xAI's update cadence on the repo).
 - `docs/platforms/<name>.md` — per-platform playbooks
 - `.claude/skills/<name>/SKILL.md` — verbs Claude can invoke
 

@@ -118,6 +118,8 @@ ls -lh "$PADDED"
 
 ## Step 5: Draft platform-tailored captions
 
+> **Drafting playbook**: Before writing copy, re-read [`docs/social-strategy.md`](../../../docs/social-strategy.md) — specifically the **Drafting checklist** (10 items) and the per-platform sections for the platforms you enabled. Walk the checklist explicitly while drafting (reply-bait question? DM-share framing? video qualifies for VQV? no slop signals?).
+
 Each platform has a different audience and constraint set. Write one draft per platform; let the user review later if you want a confirmation step.
 
 ### Instagram (long, descriptive)

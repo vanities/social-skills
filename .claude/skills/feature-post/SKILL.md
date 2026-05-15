@@ -98,6 +98,8 @@ Use `edge` (seamless) by default. Suggest `blur` mode if the post is hero / aest
 
 ## Step 4: Draft captions per platform
 
+> **Drafting playbook**: Before writing copy, re-read [`docs/social-strategy.md`](../../../docs/social-strategy.md) — specifically the **Drafting checklist** (10 items) and the **Per-platform application** sections for LinkedIn / Instagram / X / Pinterest. Walk the checklist explicitly while drafting (reply-bait question? DM-share framing? video qualifies for VQV? no slop signals?). When you show drafts for approval in Step 5, briefly note which checklist items each draft hits.
+
 Use `$BRAND_VOICE` (from brand.json) to tone all four drafts. The shape below is structural — what fields each platform wants — not voice. Match `$BRAND_VOICE` for tone.
 
 **LinkedIn (professional / builder tone)**:
