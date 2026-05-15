@@ -30,15 +30,12 @@ fi
 PROFILE="${PROFILE:-$HOME/.social-skills/chrome-profile}"
 PROFILE="${PROFILE/#\~/$HOME}"
 
-# Strict guard: skip cleanly unless (a) Chrome is alive with OUR profile,
-# (b) the agent-browser daemon is running, and (c) the daemon is attached
-# to Chrome (or can re-attach without spawning a fresh browser).
-PORT=$(head -1 "$PROFILE/DevToolsActivePort" 2>/dev/null || true)
-DAEMON_PID=$(pgrep -f 'agent-browser-darwin' | head -1 || true)
-if [[ -z "$PORT" || -z "$DAEMON_PID" ]]; then
-  echo "$(date -u +%H:%M:%SZ) skipped — DevToolsActivePort or daemon missing (profile=$PROFILE, port=${PORT:-?}, pid=${DAEMON_PID:-?})"
-  exit 0
-fi
+launch_browser_once() {
+  local reason="$1"
+  echo "$(date -u +%H:%M:%SZ) launching browser — $reason"
+  bash scripts/launch_browser.sh
+  sleep 2
+}
 
 # Probe Chrome's tab list via plain HTTP. NEVER use agent-browser for any guard
 # step — agent-browser's `tab list` auto-spawns a fresh Chrome when its CDP
@@ -52,9 +49,18 @@ fi
 # 6:22 PM CDT skip — Chrome was busy and curl's 3s read returned a body with no
 # platform URLs in it, even though the tabs were pinned and present.
 probe_tabs() {
+  PORT=$(head -1 "$PROFILE/DevToolsActivePort" 2>/dev/null || true)
+  DAEMON_PID=$(pgrep -f 'agent-browser-darwin' | head -1 || true)
+  if [[ -z "$PORT" || -z "$DAEMON_PID" ]]; then
+    return 0
+  fi
   curl -sS -m 8 "http://127.0.0.1:${PORT}/json/list" 2>/dev/null || true
 }
 TAB_JSON=$(probe_tabs)
+if [ -z "$TAB_JSON" ]; then
+  launch_browser_once "DevToolsActivePort, daemon, or HTTP /json/list was unavailable (profile=$PROFILE, port=${PORT:-?}, pid=${DAEMON_PID:-?})"
+  TAB_JSON=$(probe_tabs)
+fi
 if [ -z "$TAB_JSON" ] || ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pinterest\.com|linkedin\.com'; then
   echo "$(date -u +%H:%M:%SZ) probe miss — retrying in 2s"
   sleep 2
@@ -62,7 +68,7 @@ if [ -z "$TAB_JSON" ] || ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pi
 fi
 
 if [ -z "$TAB_JSON" ]; then
-  echo "$(date -u +%H:%M:%SZ) skipped — Chrome at port $PORT is unreachable (HTTP /json/list returned nothing after retry; refusing to auto-spawn a fresh browser)"
+  echo "$(date -u +%H:%M:%SZ) skipped — Chrome at port ${PORT:-?} is unreachable after launch attempt (HTTP /json/list returned nothing after retry)"
   exit 0
 fi
 
