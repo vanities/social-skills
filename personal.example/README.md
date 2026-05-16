@@ -9,13 +9,13 @@ See [`PERSONAL.md`](../PERSONAL.md) at the repo root for the full pattern. Quick
 cp config/brand.example.json config/brand.json
 $EDITOR config/brand.json
 
-# 2. Personal CLAUDE.md addendum — Claude Code auto-loads any *.local.md
-cp CLAUDE.local.md.example CLAUDE.local.md   # at the repo root, next to CLAUDE.md
+# 2. Personal Claude Code addendum — Claude Code auto-loads CLAUDE.local.md
+cp CLAUDE.local.md.example CLAUDE.local.md   # at the repo root, next to CLAUDE.md (symlink to AGENTS.md)
 $EDITOR CLAUDE.local.md
 
 # 3. Domain-specific composite skill (cron-driven daily content)
-cp -R personal.example/skills/post-daily-content .claude/skills/post-daily-content
-$EDITOR .claude/skills/post-daily-content/SKILL.md
+cp -R personal.example/skills/post-daily-content skills/post-daily-content
+$EDITOR skills/post-daily-content/SKILL.md
 
 # 4. Cron entrypoint (calls the skill above via headless Claude Code)
 cp personal.example/scripts/daily_content.sh scripts/daily_content.sh

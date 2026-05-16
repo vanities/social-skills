@@ -1,6 +1,6 @@
-# CLAUDE.local.md — personal addendum (sample)
+# CLAUDE.local.md — Claude Code personal addendum (sample)
 
-> Claude Code auto-loads `CLAUDE.local.md` alongside `CLAUDE.md`. This file is **gitignored** — put your private brand context, live state, and account routing notes here. Public PII-free playbook stays in `CLAUDE.md`.
+> Claude Code auto-loads `CLAUDE.local.md` alongside `CLAUDE.md` (a symlink to universal `AGENTS.md`). This file is **gitignored** — put your private brand context, live state, and account routing notes here. Public PII-free playbook stays in `AGENTS.md`.
 
 ## Your brand at a glance
 
@@ -30,7 +30,7 @@ Skills like `/x-post` take an explicit `account` arg precisely because the brows
 
 ## Live state (most recent)
 
-> Keep this current. Useful for picking up where you left off across Claude sessions. Each entry is "what's live" — not a full history. The committed CLAUDE.md docs the playbook; this file docs the actual state.
+> Keep this current. Useful for picking up where you left off across Claude sessions. Each entry is "what's live" — not a full history. The committed AGENTS.md docs the playbook; this file docs the actual state.
 
 - **Instagram** — bio, last post, link in bio
 - **X** — last tweet, follower trajectory, any standing graduated-access state
@@ -52,6 +52,6 @@ Skills like `/x-post` take an explicit `account` arg precisely because the brows
 
 ## Known issues / gotchas (private)
 
-> Brand-specific quirks. Generic platform gotchas belong in `CLAUDE.md`.
+> Brand-specific quirks. Generic platform gotchas belong in `AGENTS.md`.
 
 - ...

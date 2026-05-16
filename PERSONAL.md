@@ -7,8 +7,8 @@ Three layers of personal config live alongside the public code:
 | What | Committed (template) | Gitignored (yours) | Purpose |
 |---|---|---|---|
 | **Brand** | [`config/brand.example.json`](config/brand.example.json) | `config/brand.json` | Handles, company IDs, topic regex, brand voice. Schema supports a parent org with N child brands. |
-| **CLAUDE addendum** | [`CLAUDE.local.md.example`](CLAUDE.local.md.example) | `CLAUDE.local.md` | Live state, account routing, in-flight work, brand-specific decisions. Auto-loaded by Claude Code alongside `CLAUDE.md`. |
-| **Composite skills + cron** | [`personal.example/`](personal.example/) | `.claude/skills/post-daily-<your-brand>/`, `scripts/daily_content.sh`, `scripts/devotional_video*.sh`, `personal/` | Brand-specific composite skills, cron entrypoints, and any helpers tied to your domain. |
+| **Claude Code addendum** | [`CLAUDE.local.md.example`](CLAUDE.local.md.example) | `CLAUDE.local.md` | Live state, account routing, in-flight work, brand-specific decisions. Auto-loaded by Claude Code alongside `CLAUDE.md` (which symlinks to universal `AGENTS.md`). |
+| **Composite skills + cron** | [`personal.example/`](personal.example/) | `skills/post-daily-<your-brand>/`, `scripts/daily_content.sh`, `scripts/devotional_video*.sh`, `personal/` | Brand-specific composite skills, cron entrypoints, and any helpers tied to your domain. `.claude/skills` symlinks to `skills/` for Claude Code. |
 | **Comment corpus** (optional) | [`personal.example/comment-corpus.brand.json`](personal.example/comment-corpus.brand.json) | `config/comment-corpus.json` (you edit it directly) | Domain-specific phrases for warm-comments. |
 
 ## Quickstart
@@ -18,13 +18,13 @@ Three layers of personal config live alongside the public code:
 cp config/brand.example.json config/brand.json
 $EDITOR config/brand.json
 
-# 2. Personal CLAUDE addendum (auto-loaded by Claude Code)
+# 2. Personal Claude Code addendum (auto-loaded by Claude Code)
 cp CLAUDE.local.md.example CLAUDE.local.md
 $EDITOR CLAUDE.local.md
 
 # 3. Daily-content composite skill (cron-driven fan-out)
-cp -R personal.example/skills/post-daily-content .claude/skills/post-daily-<your-brand>
-$EDITOR .claude/skills/post-daily-<your-brand>/SKILL.md   # tailor to your iOS app + content
+cp -R personal.example/skills/post-daily-content skills/post-daily-<your-brand>
+$EDITOR skills/post-daily-<your-brand>/SKILL.md   # tailor to your iOS app + content
 
 # 4. Cron entrypoint (calls the skill above via headless Claude Code)
 cp personal.example/scripts/daily_content.sh scripts/daily_content.sh
@@ -90,13 +90,13 @@ The LinkedIn company id sits at the **org** level, not per brand — a single co
 
 ## Per-brand composite skills
 
-Brand-flavored composite skills (like a daily-content fan-out) belong in `.claude/skills/post-daily-<brand>/` (gitignored). The template at `personal.example/skills/post-daily-content/` shows the shape: drive the iOS sim → screenshot → pad → extract content → caption per platform → fan out via the platform skills.
+Brand-flavored composite skills (like a daily-content fan-out) belong in `skills/post-daily-<brand>/` (gitignored). Claude Code still sees them because `.claude/skills` symlinks to `../skills`. The template at `personal.example/skills/post-daily-content/` shows the shape: drive the iOS sim → screenshot → pad → extract content → caption per platform → fan out via the platform skills.
 
 If you have multiple brands, copy the template once per brand:
 
 ```bash
-cp -R personal.example/skills/post-daily-content .claude/skills/post-daily-myapp
-cp -R personal.example/skills/post-daily-content .claude/skills/post-daily-side-project
+cp -R personal.example/skills/post-daily-content skills/post-daily-myapp
+cp -R personal.example/skills/post-daily-content skills/post-daily-side-project
 ```
 
 Then customize each (different bundle id, different content extraction logic, different voice).

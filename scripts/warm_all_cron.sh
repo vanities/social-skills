@@ -21,7 +21,7 @@ export PATH="$HOME/.vite-plus/bin:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/
 cd "$(dirname "$0")/.."
 
 # Read SOCIAL_SKILLS_CHROME_PROFILE + CLAUDE_CODE_OAUTH_TOKEN from .env
-# (single-var greps — never `source`, see CLAUDE.md re: passwords with $).
+# (single-var greps — never `source`, see AGENTS.md re: passwords with $).
 if [[ -f .env ]]; then
   PROFILE="$(grep -m1 '^SOCIAL_SKILLS_CHROME_PROFILE=' .env | cut -d= -f2-)"
   TOKEN="$(grep -m1 '^CLAUDE_CODE_OAUTH_TOKEN=' .env | cut -d= -f2-)"

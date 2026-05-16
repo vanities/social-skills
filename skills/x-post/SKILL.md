@@ -7,7 +7,7 @@ allowed-tools: Bash(agent-browser *) Bash(bash *) Bash(test *) Bash(date *) Bash
 
 # Post to X (Twitter)
 
-Account handle: `$0` (no `@`). **Required** — there is no default. Caller is responsible for passing the right one (see CLAUDE.md account-routing rules).
+Account handle: `$0` (no `@`). **Required** — there is no default. Caller is responsible for passing the right one (see AGENTS.md account-routing rules; Claude Code also sees this through the CLAUDE.md symlink).
 Thread file: `$1` — JSON array of tweet objects.
 
 The browser may currently be signed in as a different account. This skill switches to `$0` automatically before composing — see Step 2.

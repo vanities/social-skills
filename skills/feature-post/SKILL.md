@@ -69,7 +69,7 @@ mkdir -p "$SCREENSHOT_DIR"
 
 ## Step 2: Capture screenshots
 
-Verify XcodeBuildMCP is configured with `XCODEBUILDMCP_ENABLED_WORKFLOWS=simulator,device,debugging,ui-automation` (see CLAUDE.md "Known issues" if `tap` / `snapshot_ui` aren't surfaced). Confirm a simulator is booted.
+Verify XcodeBuildMCP is configured with `XCODEBUILDMCP_ENABLED_WORKFLOWS=simulator,device,debugging,ui-automation` (see AGENTS.md "Known issues" if `tap` / `snapshot_ui` aren't surfaced). Confirm a simulator is booted.
 
 Ask the user one question:
 

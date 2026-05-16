@@ -6,7 +6,7 @@ allowed-tools: Bash(xcrun simctl*) Bash(agent-browser *) Bash(bash *) Bash(test 
 
 # Post today's content to enabled platforms
 
-> **Sample skill — copy + edit.** This file lives in `personal.example/skills/post-daily-content/` and is intended to be copied to `.claude/skills/post-daily-content/` (gitignored) and customized for your brand. The shape — capture → pad → extract → caption per platform → fan-out → log — is reusable; the iOS-app-driving + content-extraction steps are domain-specific.
+> **Sample skill — copy + edit.** This file lives in `personal.example/skills/post-daily-content/` and is intended to be copied to `skills/post-daily-content/` (gitignored; surfaced to Claude through `.claude/skills`) and customized for your brand. The shape — capture → pad → extract → caption per platform → fan-out → log — is reusable; the iOS-app-driving + content-extraction steps are domain-specific.
 
 Reads `config/brand.json` for handles, default boards, and brand metadata.
 

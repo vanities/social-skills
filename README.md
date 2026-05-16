@@ -2,14 +2,14 @@
 
 *because I'm terrible at being social.*
 
-Skill-driven social media automation. The agent (Claude Code, OAuth-authed) does the work; this repo provides the playbook.
+Skill-driven social media automation. The agent (Claude Code today, OAuth-authed) does the work; this repo provides the playbook.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  Trigger: cron / interactive slash command                 │
 │                       │                                    │
 │                       ▼                                    │
-│  Skill (.claude/skills/<name>/SKILL.md)                    │
+│  Skill (skills/<name>/SKILL.md; .claude/skills symlink)    │
 │       │  reads platform docs (docs/platforms/*.md)         │
 │       ▼                                                    │
 │  Agent (Claude Code, OAuth-authed — no API key)            │
@@ -69,14 +69,14 @@ That's it. Skills do the rest. For composite cron-driven skills (like a daily-co
 | `/linkedin-login` · `/linkedin-post <personal\|<company-id>> <media...> <caption>` | ✅ Personal feed or company-page. Multi-image carousels supported. |
 | `/x-login` · `/x-post <handle> <thread-json>` | ✅ Single tweet or multi-tweet **reply chain** (X's in-modal threads don't accept programmatic uploads to the 2nd+ tweet). Handle is REQUIRED — switches the X session before composing. |
 | `/pinterest-login` · `/pinterest-post <pin-json>` | ✅ Tall iPhone screenshots fit Pinterest natively (no padding). Creates boards inline. |
-| `/tiktok-post` | 🚫 Deferred — TikTok web upload is video-only (Photo Mode is mobile-app exclusive). See `.claude/skills/tiktok-post/SKILL.md` for unblock paths. |
+| `/tiktok-post` | 🚫 Deferred — TikTok web upload is video-only (Photo Mode is mobile-app exclusive). See `skills/tiktok-post/SKILL.md` for unblock paths. |
 
 ### Composite + orchestration
 
 | Skill | What it does |
 |---|---|
 | `/feature-post <description> [brand-slug] [platforms]` | End-to-end feature launch. Drives the iOS sim via XcodeBuildMCP, captures screenshots, pads, drafts platform-specific captions (announcement-style for LinkedIn / IG / X; search-rewritten how-to for Pinterest), gets your approval, then cross-posts to enabled platforms. Reads handles + brand voice from `config/brand.json`. |
-| Daily-content composite | A cron-driven daily fan-out skill is templated in `personal.example/skills/post-daily-content/` — copy to `.claude/skills/post-daily-<brand>/` (gitignored) and customize. See [`PERSONAL.md`](PERSONAL.md). |
+| Daily-content composite | A cron-driven daily fan-out skill is templated in `personal.example/skills/post-daily-content/` — copy to `skills/post-daily-<brand>/` (gitignored; visible to Claude through `.claude/skills`) and customize. See [`PERSONAL.md`](PERSONAL.md). |
 
 ### Engagement / warming
 
@@ -142,8 +142,9 @@ Both wrappers invoke `claude --print --dangerously-skip-permissions "/<skill>"` 
 ```
 social-skills/
 ├── README.md
-├── CLAUDE.md                          ← agent playbook (PII-free, read on a fresh Claude session)
-├── CLAUDE.local.md.example            ← personal addendum template (handles, live state, voice)
+├── AGENTS.md                          ← universal agent playbook (PII-free)
+├── CLAUDE.md -> AGENTS.md             ← Claude Code compatibility symlink
+├── CLAUDE.local.md.example            ← Claude Code personal addendum template (handles, live state, voice)
 ├── PERSONAL.md                        ← how the personal/.example pattern works
 ├── .env.example
 ├── config/
@@ -163,7 +164,7 @@ social-skills/
 │   ├── find_platform_tab.sh
 │   ├── switch_to_platform_tab.sh
 │   └── warm_all_cron.sh
-├── .claude/skills/
+├── skills/                             ← universal skill source of truth
 │   ├── instagram-{login,post,warm}/SKILL.md
 │   ├── linkedin-{login,post}/SKILL.md
 │   ├── x-{login,post,warm,article}/SKILL.md
@@ -172,6 +173,8 @@ social-skills/
 │   ├── tiktok-post/SKILL.md           ← stub, deferred
 │   ├── feature-post/SKILL.md
 │   └── warm-all/SKILL.md
+├── .claude/
+│   └── skills -> ../skills             ← Claude Code compatibility symlink
 └── personal.example/                  ← templates for brand-flavored composite skills
     ├── README.md
     ├── comment-corpus.brand.json      ← sample domain-specific comment phrases
@@ -185,9 +188,9 @@ social-skills/
 ## Adding a platform
 
 1. Write `docs/platforms/<name>.md` — URLs, login flow, anti-bot notes.
-2. Add skills `.claude/skills/<name>-login/SKILL.md`, `<name>-post/SKILL.md`, optionally `<name>-warm/SKILL.md`. Mirror the `x-*` skills as a template — they cover the trickiest cases (graduated-access, reply-chain threads, viewport-required clicks).
+2. Add skills `skills/<name>-login/SKILL.md`, `<name>-post/SKILL.md`, optionally `<name>-warm/SKILL.md`. Claude Code sees them through `.claude/skills -> ../skills`. Mirror the `x-*` skills as a template — they cover the trickiest cases (graduated-access, reply-chain threads, viewport-required clicks).
 3. Update `config/engagement-schedule.json` with the platform's action budget.
-4. Wire into `/warm-all` and your daily-content composite (in `.claude/skills/post-daily-<brand>/`) if you want it cron-scheduled.
+4. Wire into `/warm-all` and your daily-content composite (in `skills/post-daily-<brand>/`) if you want it cron-scheduled.
 
 ## Status
 

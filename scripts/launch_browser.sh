@@ -77,7 +77,7 @@ echo "Chrome binary:           $CHROME_BIN"
 # Wait for Chrome to settle (session restore takes a moment), then probe the
 # list of currently-open tabs via plain HTTP and add any missing essentials.
 # This NEVER calls agent-browser tab list — that path can auto-spawn a fresh
-# Chrome on CDP attach failure (see CLAUDE.md "Known issues").
+# Chrome on CDP attach failure (see AGENTS.md "Known issues").
 
 ensure_essential_tabs() {
   if [ ! -f "$BRAND_JSON" ]; then

@@ -32,8 +32,8 @@ articles/
 # config/brand.example.json — copy that to config/brand.json and edit.
 config/brand.json
 
-# Per-user CLAUDE.md addendum — Claude Code auto-loads any *.local.md
-# alongside CLAUDE.md. Shape in CLAUDE.local.md.example.
+# Per-user Claude Code addendum — Claude Code auto-loads CLAUDE.local.md
+# alongside CLAUDE.md (a symlink to AGENTS.md). Shape in CLAUDE.local.md.example.
 CLAUDE.local.md
 *.local.md
 !*.local.md.example
@@ -43,11 +43,12 @@ CLAUDE.local.md
 # to share back upstream.
 personal/
 
-# Brand-specific composite skill (drives an iOS app, captions are domain
-# specific). Template in personal.example/skills/post-daily-content/. Copy
-# to .claude/skills/post-daily-<your-domain>/ and customize.
-.claude/skills/post-daily-devotional/
-.claude/skills/post-daily-content/
+# Brand-specific composite skills (drives an iOS app, captions are domain
+# specific). Shared skills live in skills/; .claude/skills is a compatibility
+# symlink for Claude Code. Copy templates to skills/post-daily-<your-domain>/
+# and customize.
+skills/post-daily-*/
+.claude/skills/post-daily-*/
 
 # Brand-specific cron entrypoints + ancillary helpers. Templates in
 # personal.example/scripts/. Copy to scripts/ if you want them on disk
