@@ -63,8 +63,10 @@ BODY="$3"
 ### Step 2: Switch to Reddit tab
 
 ```bash
-agent-browser tab list 2>&1 | head -10
-# Switch into the reddit.com tab; if none: tab new https://www.reddit.com/
+# Find the existing Reddit tab and switch into it; opens reddit.com ONLY if no
+# reddit.com tab exists. NEVER `agent-browser tab list` (auto-spawn risk) —
+# the helper is curl-based find + switch + verify, no duplicate.
+bash scripts/switch_to_platform_tab.sh "reddit.com" "https://www.reddit.com/"
 ```
 
 If `agent-browser get url` returns a login page, abort with "run /reddit-login first".

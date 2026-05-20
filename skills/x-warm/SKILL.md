@@ -21,6 +21,16 @@ allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *
 
 If `brand.json` is missing or the resolved brand has no `x` config, the skill aborts with a setup hint — see `config/brand.example.json` and `PERSONAL.md`.
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-x-warm.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 0: Resolve brand + load config
 
 ```bash
@@ -252,6 +262,13 @@ After all actions, write `~/.social-skills/logs/warm/x-default-<timestamp>.json`
   "actions_today_after": {"scroll": 1, "like": 1, "repost": 0},
   "skipped_reason": null
 }
+```
+
+## Step 7a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
 ```
 
 ## Step 7: Report

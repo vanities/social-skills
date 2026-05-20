@@ -13,6 +13,16 @@ Caption: `$2`
 
 Reference: `docs/platforms/instagram.md`.
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-instagram-post.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 1: Sanity checks
 
 ```!
@@ -358,6 +368,13 @@ Use the `Write` tool to create `~/.social-skills/logs/post/instagram-$0-<timesta
 Substitute `<timestamp>` with `date +%Y-%m-%dT%H-%M-%S`.
 
 **Do not close the tab** — leave the browser as the user left it. The shared-browser model means the user may want to inspect the result.
+
+## Step 9a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
 
 ## Step 10: Report
 

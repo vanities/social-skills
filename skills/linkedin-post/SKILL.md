@@ -13,6 +13,16 @@ Caption:  `$2`
 
 Reference: `docs/platforms/linkedin.md`.
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-linkedin-post.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 1: Sanity checks
 
 ```!
@@ -239,6 +249,13 @@ Use `Write` to create `~/.social-skills/logs/post/linkedin-$0-<timestamp>.json`:
 }
 ```
 
+## Step 9a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
+
 ## Step 10: Report
 
-Outcome, screenshot path, run log path. **Do not close the tab.**
+Outcome, screenshot path, run log path. **Do not close the LinkedIn platform tab** — the closer protects it via `essential_tabs`; only incidentally-spawned tabs (link previews, redirects) get cleaned up.

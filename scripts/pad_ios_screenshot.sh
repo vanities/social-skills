@@ -25,6 +25,8 @@
 #   father      Deep navy/charcoal + golden crosses + steady amber glow +
 #               "father/papa/dad/strong/refuge/provider/shepherd" words.
 #   dream       Dimmed blur bg + faded scripture words + sparkles.
+#   ascii-art   Terminal-green monospace glyph field + scripture words — a static
+#               ASCII-art-inspired background for occasional tech/text variety.
 #   shadow      Dark slate/black gradient + dim crosses + cautionary words
 #               ("beware/watch/discern/wake") — for warning / deception / judgment
 #               themed verses where the lighter modes would read tone-deaf.
@@ -337,6 +339,38 @@ decorate_orbs() {
   done
 }
 
+# Sparse monospace glyph field for the `ascii-art` background. Keep every glyph
+# in the padding strips only; the screenshot itself should remain readable.
+svg_ascii_text() {
+  local cx=$1 cy=$2 size=$3 color=$4 opacity=$5 text=$6
+  cat >> "$TMP/dec.svg" <<EOF
+<text x="$cx" y="$cy" font-family="Menlo,Monaco,'SF Mono','Courier New',monospace" font-size="$size" fill="$color" opacity="$opacity" text-anchor="middle">$text</text>
+EOF
+}
+
+decorate_ascii_glyphs() {
+  local count=$1; shift
+  local colors=("$@")
+  local glyphs=("+" "|" "-" "." ":" "*" "†" "✦" "░" "▒" "▓" "0" "1")
+  for ((i = 0; i < count; i++)); do
+    svg_ascii_text "$(rand_pad_x)" "$(rand_in 30 $((H - 30)))" \
+      "$(rand_in 14 34)" "$(pick "${colors[@]}")" "$(rand_opacity)" "$(pick "${glyphs[@]}")"
+  done
+}
+
+decorate_ascii_words() {
+  local count=$1
+  local words_csv=$2
+  shift 2
+  local colors=("$@")
+  IFS=',' read -ra WORDS <<< "$words_csv"
+  for ((i = 0; i < count; i++)); do
+    local word="${WORDS[$RANDOM % ${#WORDS[@]}]}"
+    svg_ascii_text "$(rand_pad_x)" "$(rand_in 120 $((H - 120)))" \
+      "$(rand_in 18 28)" "$(pick "${colors[@]}")" "0.$((35 + RANDOM % 45))" "$word"
+  done
+}
+
 # ---------- mode dispatch (basics first, exit early) ----------
 
 case "$MODE" in
@@ -439,6 +473,15 @@ case "$MODE" in
     decorate_sparkles 28 "#FFFFFF" "#FFFAE0"
     svg_done
     ;;
+  ascii-art)
+    bg_radial "#06301F" "#020504"
+    svg_init
+    decorate_ascii_glyphs 150 "#00FF99" "#9CFFD2" "#E8FFF4" "#3CFFB0"
+    decorate_ascii_words 14 "FAITH,GRACE,HOPE,MERCY,AMEN,LIGHT,WORD,PRAY,PEACE,TRUTH" "#9CFFD2" "#E8FFF4" "#00FF99"
+    decorate_crosses 4 "#00FF99" "#9CFFD2" "#E8FFF4"
+    decorate_sparkles 16 "#9CFFD2" "#E8FFF4"
+    svg_done
+    ;;
   shadow)
     bg_radial "#1B1F2A" "#05060A"
     svg_init
@@ -493,7 +536,7 @@ case "$MODE" in
     svg_done
     ;;
   *)
-    echo "unknown mode: $MODE (use edge|blur|random|gradient|bloom|sparkle|cosmic|divine|holy|lovely|mother|father|dream|shadow|easter|christmas|pentecost|lament|surprise|#RRGGBB)" >&2
+    echo "unknown mode: $MODE (use edge|blur|random|gradient|bloom|sparkle|cosmic|divine|holy|lovely|mother|father|dream|ascii-art|shadow|easter|christmas|pentecost|lament|surprise|#RRGGBB)" >&2
     exit 1
     ;;
 esac

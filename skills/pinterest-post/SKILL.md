@@ -27,6 +27,16 @@ allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash
 - `board` is required. Pinterest blocks publish until a board is selected.
 - `link` is optional but highly recommended — Pinterest's primary value is driving traffic.
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-pinterest-post.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 1: Sanity checks
 
 ```!
@@ -224,6 +234,13 @@ Use `Write` to create `~/.social-skills/logs/post/pinterest-default-<timestamp>.
 }
 ```
 
+## Step 10a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
+
 ## Step 11: Report
 
-Outcome, pin URL, screenshot path, run log path. **Do not close the tab.**
+Outcome, pin URL, screenshot path, run log path. **Do not close the Pinterest platform tab** — the closer protects it via `essential_tabs`; only incidentally-spawned tabs get cleaned up.

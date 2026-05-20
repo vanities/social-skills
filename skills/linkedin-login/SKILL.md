@@ -12,16 +12,29 @@ Reference:          `docs/platforms/linkedin.md`.
 
 `.env` uses unsplit `LINKEDIN_USERNAME` / `LINKEDIN_PASSWORD` (single LinkedIn account; no per-label split unlike Instagram).
 
-## Find or open the LinkedIn tab
+## Snapshot tabs (for cleanup at end)
 
-```!
-agent-browser tab list 2>&1
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# Note: a NEW LinkedIn tab created here (when none existed) is protected by
+# the essential_tabs whitelist in the closer — it won't be touched.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-linkedin-login.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
 ```
 
-- If a tab matches `linkedin.com`, switch to it: `agent-browser tab <index>`. Check `agent-browser get url` — if already on `/feed/`, skip to "Save state".
-- If no LinkedIn tab: `agent-browser tab new https://www.linkedin.com/login`.
+## Find or open the LinkedIn tab
 
-Then `agent-browser wait --load networkidle`.
+```bash
+# Find the existing LinkedIn tab and switch into it; opens the login URL ONLY
+# if no linkedin.com tab exists. NEVER `agent-browser tab list` (auto-spawn
+# risk) — the helper is curl-based find + switch + verify, no duplicate.
+bash scripts/switch_to_platform_tab.sh "linkedin.com" "https://www.linkedin.com/login"
+agent-browser wait --load networkidle
+```
+
+Then check `agent-browser get url` — if already on `/feed/`, skip to "Save state".
 
 ## Snapshot the login form
 
@@ -109,6 +122,13 @@ Use the `Write` tool to create `~/.social-skills/logs/login/linkedin-default-<ti
 
 Substitute `<timestamp>` with `date +%Y-%m-%dT%H-%M-%S`.
 
+## Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
+
 ## Report
 
-Account, state file, log file, final URL. **Do not close the tab.**
+Account, state file, log file, final URL. **Do not close the LinkedIn platform tab** — the closer protects it via `essential_tabs`.

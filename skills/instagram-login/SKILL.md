@@ -19,16 +19,29 @@ The default mode of operation is the **shared headed Chrome** — keep the brows
 grep -q "^INSTAGRAM_$(echo "$0" | tr '[:lower:]' '[:upper:]')_USERNAME=" .env 2>/dev/null && echo "MODE: auto" || echo "MODE: manual"
 ```
 
-## Find or open the Instagram tab
+## Snapshot tabs (for cleanup at end)
 
-```!
-agent-browser tab list 2>&1
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# Note: a NEW Instagram tab created here (when none existed) is protected by
+# the essential_tabs whitelist in the closer — it won't be touched.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-instagram-login.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
 ```
 
-- If a tab matches `instagram.com`, switch to it: `agent-browser tab <index>`. Then check `agent-browser get url` — if it's already on a feed URL (not `/accounts/login/`), the user is already signed in and you can skip to "Save state".
-- If no IG tab: `agent-browser --headed tab new https://www.instagram.com/accounts/login/` (or `agent-browser --headed open ...` if there are zero tabs at all).
+## Find or open the Instagram tab
 
-Always `agent-browser wait --load networkidle` after.
+```bash
+# Find the existing IG tab and switch into it; opens the login URL ONLY if no
+# instagram.com tab exists. NEVER `agent-browser tab list` (auto-spawn risk) —
+# the helper is curl-based find + switch + verify and won't open a duplicate.
+bash scripts/switch_to_platform_tab.sh "instagram.com" "https://www.instagram.com/accounts/login/"
+agent-browser wait --load networkidle
+```
+
+Then check `agent-browser get url` — if it's already on a feed URL (not `/accounts/login/`), the user is already signed in and you can skip to "Save state".
 
 ## Snapshot the login form
 
@@ -124,6 +137,13 @@ Use the `Write` tool to create `~/.social-skills/logs/login/instagram-$0-<timest
 ```
 
 Substitute `<timestamp>` with `date +%Y-%m-%dT%H-%M-%S`.
+
+## Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
 
 ## Report
 

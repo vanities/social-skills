@@ -20,6 +20,16 @@ allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *
 
 If `brand.json` is missing or this brand has no IG config, the skill aborts with a setup hint.
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so Step 8 can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-instagram-warm.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 0: Resolve brand + load config
 
 ```bash
@@ -151,6 +161,13 @@ jq --arg now "$NOW_ISO" --argjson plus 1 \
 ## Step 6: Run log
 
 `~/.social-skills/logs/warm/instagram-default-<timestamp>.json` — same shape as `/x-warm`'s log. Record the post author and handle for each `like`.
+
+## Step 7a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
 
 ## Step 7: Report
 

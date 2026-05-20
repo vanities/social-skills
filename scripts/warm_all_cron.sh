@@ -81,9 +81,19 @@ if ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pinterest\.com|linkedin\
   echo "tab snapshot: $(echo "$TAB_JSON" | grep -oE '\"url\":\s*\"[^\"]*\"' | head -5 | tr '\n' ' ')"
   exit 0
 fi
+# Snapshot the current tab set so we can clean up anything the skill spawns.
+# Default `keep_tabs_open=false` in config/brand.json; close_spawned_tabs.sh
+# no-ops when the flag is true. Platform tabs (essential_tabs) and
+# browser-internal URLs are always skipped by the closer.
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-warm-$$.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+
 # --dangerously-skip-permissions: cron can't prompt; the skill is read-only
 # from a permissions standpoint (browser navigation + JSON state file writes
 # under ~/.social-skills/state/) and has been live-tested manually.
 claude --print --dangerously-skip-permissions "/warm-all"
+
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
 
 echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) warm cron complete ==="

@@ -44,11 +44,9 @@ The profile is dedicated to social automation, isolated from your everyday brows
 
 Every skill that targets a platform follows the same pattern:
 
-1. `agent-browser tab list` to see what's open.
-2. If a tab's URL matches the platform domain, `agent-browser tab <index>` to switch.
-3. If no tab exists, `agent-browser --headed tab new <url>` (or `open` if there are zero tabs).
-4. Do the work in that tab.
-5. **Do not close the tab.** Leave it for the user.
+1. `bash scripts/switch_to_platform_tab.sh <host-substring> <fallback-url>` to reach the platform tab. The helper curl-searches Chrome's `/json/list` for an existing tab on that host, switches into it, and opens a new tab **only** when no matching tab exists. **Never `agent-browser tab list`** — its CDP attach can respawn a fresh Chrome on failure even when Chrome is HTTP-healthy, killing the user's session (see AGENTS.md "Known issues").
+2. Do the work in that tab.
+3. **Do not close the tab.** Leave it for the user.
 
 ## State files
 

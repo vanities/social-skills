@@ -73,7 +73,7 @@ Probably the riskiest of the three. Worth trying ONLY if Paths A and B don't fit
 Whichever path is taken, the skill should follow the same pattern as `/instagram-post` / `/x-post`:
 
 1. Sanity-check media exists.
-2. `agent-browser tab list` → switch to TikTok tab (or open `https://www.tiktok.com/tiktokstudio/upload`).
+2. `bash scripts/switch_to_platform_tab.sh "tiktok.com" "https://www.tiktok.com/tiktokstudio/upload"` to reach the TikTok tab (curl-based find + switch; NEVER `agent-browser tab list` — auto-spawn risk).
 3. If `agent-browser get url` doesn't show TikTok as logged in, abort and tell user to manually re-sign-in (don't try to auto-login).
 4. Upload via `agent-browser upload "input[type=file]" <video-path>` (single file, video/*).
 5. Wait for processing, fill caption (real keystrokes via `type`), set privacy/options.

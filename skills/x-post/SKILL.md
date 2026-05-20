@@ -46,6 +46,16 @@ T3 → navigate to T2's detail page → reply
 
 If a future X UI change makes secondary file inputs respond to `setInputFiles`, the in-modal multi-tweet path can replace this; until then, reply-chain.
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-x-post.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 1: Sanity checks
 
 ```!
@@ -245,6 +255,13 @@ Use `Write` to create `~/.social-skills/logs/post/x-$0-<timestamp>.json`:
 }
 ```
 
+## Step 7a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
+
 ## Step 8: Report
 
-Outcome, tweet count, screenshot path, run log path. **Do not close the tab.**
+Outcome, tweet count, screenshot path, run log path. **Do not close the X platform tab** — the closer protects it via `essential_tabs`; only incidentally-spawned tabs get cleaned up.

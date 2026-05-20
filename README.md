@@ -122,7 +122,8 @@ Both wrappers invoke `claude --print --dangerously-skip-permissions "/<skill>"` 
 |---|---|
 | `scripts/launch_browser.sh` | Boots the persistent shared Chrome against `~/.social-skills/chrome-profile/` with the anti-detection flag. |
 | `scripts/jitter.sh MIN MAX` | Random delay generator — used between every browser action. |
-| `scripts/pad_ios_screenshot.sh <input> [output] [mode]` | Pads tall iPhone screenshots to 4:5. Plain modes: `edge` (seamless sample), `blur` (Apple-style frame), `random` (palette), `#RRGGBB` (solid). Fancy modes (random gradient bg + SVG decoration layer — sparkles, stars, hearts, golden crosses, mini-Bibles, doves, scripture words, glow orbs): `gradient`, `bloom`, `sparkle`, `cosmic`, `divine`, `holy`, `lovely`, `dream`. Smart: `surprise` picks a fancy mode at random. |
+| `scripts/pad_ios_screenshot.sh <input> [output] [mode]` | Pads tall iPhone screenshots to 4:5. Plain modes: `edge` (seamless sample), `blur` (Apple-style frame), `random` (palette), `#RRGGBB` (solid). Fancy modes include `gradient`, `bloom`, `sparkle`, `cosmic`, `divine`, `holy`, `lovely`, `mother`, `father`, `dream`, `ascii-art`, `shadow`, `lament`, `easter`, `christmas`, `pentecost`. Smart: `surprise` picks a lighter fancy mode at random. |
+| `scripts/ascii_devotional_video.sh <screenshot.png> [output.mp4] [theme] [reference]` | Builds a short 9:16 h264 MP4 with animated ASCII-video-style background behind a devotional screenshot. Pair with `pad_ios_screenshot.sh ... ascii-art` for the static ASCII-art-style image route. |
 | `scripts/warm_all_cron.sh` | Warming cron entrypoint — `cd` into the repo, restore `PATH`, guard the shared Chrome's health, run Claude headless. |
 | `scripts/daily_content.sh` | Daily-content cron entrypoint (template in `personal.example/scripts/`, gitignored once installed). Same guard pattern, calls your composite skill. |
 
@@ -158,6 +159,7 @@ social-skills/
 │   ├── launch_browser.sh
 │   ├── jitter.sh
 │   ├── pad_ios_screenshot.sh
+│   ├── ascii_devotional_video.sh
 │   ├── pad_ios_video.sh
 │   ├── type_human.sh
 │   ├── x_switch_account.sh

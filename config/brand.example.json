@@ -7,6 +7,9 @@
 
   "default_brand": "main",
 
+  "keep_tabs_open": false,
+  "_keep_tabs_open_comment": "When false (default), skills clean up any tabs they spawn while running and leave only the pinned platform tabs alive. When true, every tab a skill opens stays open after the run — useful if you want to review what the agent saw. Platform tabs listed in `essential_tabs` are NEVER closed regardless of this setting; only incidentally-spawned tabs (post detail views, redirect targets, etc.) are touched.",
+
   "essential_tabs": [
     "https://www.instagram.com/your_handle/",
     "https://www.linkedin.com/feed/",

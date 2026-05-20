@@ -4,26 +4,32 @@
 >
 > Account routing (which handle posts what) lives in `CLAUDE.local.md` — that's PII. This doc covers structural strategy only.
 
-## Last reviewed: 2026-05-15 — against [`xai-org/x-algorithm`](https://github.com/xai-org/x-algorithm) May 15 release
+## Last reviewed: 2026-05-15 — diffed January (`aaa167b`) → May 15 (`0bfc279`) drops
 
-xAI commits to updating the open repo every 4 weeks. To refresh:
+xAI commits to updating the open repo every 4 weeks. Refresh = full clone (not shallow) so we can diff against the previous review:
 
 ```bash
-cd /tmp && rm -rf x-algorithm && git clone --depth=1 https://github.com/xai-org/x-algorithm.git
+cd /tmp && rm -rf x-algorithm && git clone https://github.com/xai-org/x-algorithm.git
+cd /tmp/x-algorithm && git log --oneline   # find the last-reviewed SHA + the new one
+git diff <last-sha> <new-sha> --stat home-mixer/scorers/ home-mixer/filters/ grox/classifiers/
 ```
 
 Files worth re-reading on each refresh:
 
 | Path | Why |
 |---|---|
-| `home-mixer/scorers/weighted_scorer.rs` | The literal score formula. Watch for added/removed signals. |
-| `home-mixer/scorers/author_diversity_scorer.rs` | Per-viewer-session repeat-author decay. |
-| `home-mixer/scorers/oon_scorer.rs` | Out-of-network penalty (followers compound). |
+| `home-mixer/scorers/ranking_scorer.rs` | **New consolidated scorer (May 2026).** Replaces the chained `WeightedScorer + AuthorDiversityScorer + OONScorer` with one pass. Same logic; cleaner read. |
+| `home-mixer/scorers/weighted_scorer.rs` | Original 19-signal score formula. Identical to the consolidated version's `compute_weighted_score`. Watch for added/removed signals. |
+| `home-mixer/scorers/author_diversity_scorer.rs` | Per-viewer-session repeat-author decay. Per-feed-response, NOT per-day — the HashMap resets at the start of every `score()` call. |
+| `home-mixer/scorers/oon_scorer.rs` | Out-of-network penalty. May 2026 added a viewer-side new-user OON relaxation (see drafting note 8). |
 | `home-mixer/filters/vf_filter.rs` | The hard-drop visibility filter — actual shadowban path. |
-| `grox/classifiers/content/banger_initial_screen.py` | Quality / slop / minor-content classifier. |
+| `grox/classifiers/content/banger_initial_screen.py` | Quality / slop / minor-content classifier (Grok VLM). Returns `quality_score`, `slop_score`, taxonomy. Actual prompt criteria are in the elided `grox/prompts/template.py`. |
+| `grox/classifiers/content/reply_ranking.py` | **New (May 2026).** Scores replies for ordering inside a post's reply thread. Uses a `large_account_follower_threshold` param — so replies from above-threshold accounts likely surface higher in the parent author's thread. Different system from feed ranking. |
 | `phoenix/README.md` | Two-tower retrieval + transformer ranking architecture. |
 
-**What's NOT in the repo and never will be:** the actual numeric weight values (`params.rs` is intentionally excluded), the full Phoenix model checkpoint (only a mini shipped), and the `xai_visibility_filtering` crate that defines what counts as a Drop. We see the *shape*, not the *numbers*.
+**What's NOT in the repo and never will be:** the actual numeric weight values (`params.rs` is intentionally excluded), the full Phoenix model checkpoint (only a mini shipped), the `xai_visibility_filtering` crate that defines what counts as a Drop, and the `grox/prompts/template.py` that defines what makes a post "slop" or how the reply-ranker weights large-account threshold. We see the *shape*, not the *numbers* — and for the Grok classifiers, not the prompts either.
+
+**Sanity-checking influencer "what just changed" tweets:** Most are fiction. Specific numbers like "4+ posts/day = penalty" or "media gets 2x weight now" can be directly falsified by reading `ranking_scorer.rs` / `weighted_scorer.rs` — the diversity scorer is per-feed (not per-day) and there is no media-conditional global multiplier (only the VQV signal, which is binary on/off based on video duration). Don't update strategy based on hype tweets; update it from the diff.
 
 ---
 
@@ -80,15 +86,16 @@ Derived from the weights and rerankers above. Skills should walk this list befor
 5. **Bait `profile_click`.** Strong opening that hints at expertise → people click your profile to read more from you. Bio CTA matters because of this.
 6. **Avoid the negative weights.** Polarizing-for-clicks isn't free — `not_interested`, `mute`, `block`, `report` are *summed* into the score with negative weights, and the offset formula in `weighted_scorer.rs:83-91` pushes net-negative posts below zero (not just slightly down). Provocation that alienates costs more than mild posts gain.
 7. **Don't post >1× per audience-overlap window.** Author diversity decays your subsequent posts per viewer session. Quality > quantity is mathematically baked in. Posting 2–3× a day across timezone-staggered audiences (different viewer cohorts) dodges this.
-8. **Build in-network first.** Every follower removes the OON multiplier for that viewer's feed. The first 1K followers compound disproportionately because each one is a structural lift on every future post they see. Warming (mutual-follow signals, niche-adjacent engagement) is the cheap path.
+8. **Build in-network first.** Every follower removes the OON multiplier for that viewer's feed. The first 1K followers compound disproportionately because each one is a structural lift on every future post they see. Warming (mutual-follow signals, niche-adjacent engagement) is the cheap path. *(Side note: `ranking_scorer.rs:227-238` adds a viewer-side relaxation — viewers younger than `NewUserAgeThresholdSecs` who follow ≥ `NEW_USER_MIN_FOLLOWING` accounts see a softer OON penalty. This is a cold-start tweak for new viewers, not a boost for new authors; doesn't change drafting.)*
 9. **Avoid slop signals.** The Grox VLM tags low-effort AI content. Native-look, specific, lived-experience captions read very differently from generic-template content. If the caption could plausibly be auto-generated for any post, rewrite it.
 10. **Don't trip VF.** Hard drop is binary — borderline policy content gets removed entirely, not down-ranked. Stay clear of the line.
+11. **Reply on big accounts as a profile-click farm.** `grox/classifiers/content/reply_ranking.py` (new May 2026) ranks replies *inside* a parent post's thread using a Grok VLM that takes a `large_account_follower_threshold` parameter. A substantive early reply on a viral post from a sizable account can surface near the top of the visible thread — which drives `profile_click` from people scrolling the thread, even when they don't engage with the parent. **Implication for warming**: prioritize being early + specific on big-account posts in our niche, not just liking them. This is a different lever from the 10 items above (which all act on engagement *to our own posts*); this acts on attention *we siphon from someone else's post*. **Implementation caveat**: this lever conflicts with the corpus-only comment rule in CLAUDE.md (which exists to keep cron-fired warm passes bot-undetectable). A substantive reply is by definition off-corpus. So item 11 is a **manual / interactive lever**, not a warm-skill action — the user (or Claude in an interactive session, not in cron) drafts the reply and posts it via `/x-post <account> <thread.json>` or by hand. Don't try to wire it into `/x-warm`.
 
 ---
 
 ## Per-platform application
 
-The 10 rules above are X-derived but mostly port. Per-platform deltas:
+The 11 rules above are X-derived but mostly port. Per-platform deltas:
 
 ### X
 - **Caption ≤ 280 chars** — front-load the hook in the first ~80 chars (above-the-fold in feed), save the reply-bait question for the end.

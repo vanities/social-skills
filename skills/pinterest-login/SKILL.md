@@ -11,16 +11,29 @@ Log path:           `~/.social-skills/logs/login/pinterest-default-<timestamp>.j
 
 `.env` uses unsplit `PINTEREST_USERNAME` / `PINTEREST_PASSWORD` (single account, same convention as LinkedIn / X). The username is typically the account email.
 
-## Find or open the Pinterest tab
+## Snapshot tabs (for cleanup at end)
 
-```!
-agent-browser tab list 2>&1
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# Note: a NEW Pinterest tab created here (when none existed) is protected by
+# the essential_tabs whitelist in the closer — it won't be touched.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-pinterest-login.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
 ```
 
-- If a tab matches `pinterest.com`, switch to it (`agent-browser tab <index>`). Check `agent-browser get url` — if already on the home feed (`pinterest.com/` with content visible), skip to "Save state".
-- Else: `agent-browser tab new https://www.pinterest.com/login/`.
+## Find or open the Pinterest tab
 
-Then `agent-browser wait --load networkidle`.
+```bash
+# Find the existing Pinterest tab and switch into it; opens the login URL ONLY
+# if no pinterest.com tab exists. NEVER `agent-browser tab list` (auto-spawn
+# risk) — the helper is curl-based find + switch + verify, no duplicate.
+bash scripts/switch_to_platform_tab.sh "pinterest.com" "https://www.pinterest.com/login/"
+agent-browser wait --load networkidle
+```
+
+Then check `agent-browser get url` — if already on the home feed (`pinterest.com/` with content visible), skip to "Save state".
 
 ## Snapshot the login form
 
@@ -106,6 +119,13 @@ Use the `Write` tool to create `~/.social-skills/logs/login/pinterest-default-<t
 }
 ```
 
+## Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
+
 ## Report
 
-Account, state file, log file, final URL. **Do not close the tab.**
+Account, state file, log file, final URL. **Do not close the Pinterest platform tab** — the closer protects it via `essential_tabs`.

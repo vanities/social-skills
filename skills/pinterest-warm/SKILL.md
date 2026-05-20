@@ -17,6 +17,16 @@ allowed-tools: Bash(*) Bash(agent-browser *) Bash(jq *) Bash(date *) Bash(grep *
 | **topic_filter_regex** | `brands.<slug>.pinterest.topic_filter_regex` | Case-insensitive regex matched against pin title/description. Saves and reacts only fire on pins that match — keeps the warming on-brand. Falls back to `brands.<slug>.x.topic_filter_regex` if the Pinterest-specific one isn't set. |
 | **exclude_handles_substring** | `brands.<slug>.pinterest.exclude_handles_substring` | Comma-separated substrings to skip in author handles (parody / impersonation risk). Empty disables. |
 
+## Step 0a: Snapshot tabs (for cleanup at end)
+
+```bash
+# Record the current tab set so the final step can close anything we spawn.
+# No-op behaviorally when config/brand.json has keep_tabs_open: true.
+# See AGENTS.md → "Spawned-tab cleanup".
+TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-pinterest-warm.json"
+bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
+```
+
 ## Step 0: Resolve brand + load config
 
 ```bash
@@ -380,6 +390,13 @@ jq --arg now "$NOW_ISO" \
 ## Step 6: Run log
 
 `~/.social-skills/logs/warm/pinterest-default-<timestamp>.json` — same shape as the `/x-warm` log. Capture `pin_id` (extracted from the URL after click) for each `save` action, plus the board it landed in.
+
+## Step 7a: Close spawned tabs
+
+```bash
+bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
+rm -f "$TAB_BASELINE"
+```
 
 ## Step 7: Report
 
