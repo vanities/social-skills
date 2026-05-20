@@ -93,6 +93,18 @@ Derived from the weights and rerankers above. Skills should walk this list befor
 
 ---
 
+## Voice & punctuation (anti-slop)
+
+Concrete application of checklist item 9. Applies to all caption text, including the free-form reflection/body you write each time, not just the template scaffolding in a skill:
+
+- **Never use em-dashes (`—`) or en-dashes (`–`) as punctuation.** The em-dash is the single most recognizable AI-writing tell, and the Grok slop classifier (`banger_initial_screen.py`) is exactly the kind of VLM that keys on it. Use a period, comma, colon, or parentheses instead.
+  - Bad: `Grief finds you — what helps, the right words or just sitting beside someone?`
+  - Good: `When grief finds you, what helps more: the right words, or someone just sitting beside you?`
+- If a sentence only works with an em-dash, it is two sentences. Split it, or use a colon to introduce the second half.
+- This rule is about **posted captions**, not this doc or other internal notes. Internal markdown can keep using em-dashes freely.
+
+---
+
 ## Per-platform application
 
 The 11 rules above are X-derived but mostly port. Per-platform deltas:

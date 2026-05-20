@@ -98,7 +98,9 @@ Use `edge` (seamless) by default. Suggest `blur` mode if the post is hero / aest
 
 ## Step 4: Draft captions per platform
 
-> **Drafting playbook**: Before writing copy, re-read [`docs/social-strategy.md`](../../../docs/social-strategy.md) — specifically the **Drafting checklist** (10 items) and the **Per-platform application** sections for LinkedIn / Instagram / X / Pinterest. Walk the checklist explicitly while drafting (reply-bait question? DM-share framing? video qualifies for VQV? no slop signals?). When you show drafts for approval in Step 5, briefly note which checklist items each draft hits.
+> **Drafting playbook**: Before writing copy, re-read [`docs/social-strategy.md`](../../../docs/social-strategy.md) — specifically the **Drafting checklist** and the **Per-platform application** sections for LinkedIn / Instagram / X / Pinterest. Walk the checklist explicitly while drafting (reply-bait question? DM-share framing? video qualifies for VQV? no slop signals?). When you show drafts for approval in Step 5, briefly note which checklist items each draft hits.
+
+> **No em-dashes.** Don't use `—` (or `–`) anywhere in the caption text on any platform. They are the #1 AI-writing tell and feed the slop classifier (see [`docs/social-strategy.md`](../../../docs/social-strategy.md) → "Voice & punctuation"). Use a period, comma, colon, or parentheses instead.
 
 Use `$BRAND_VOICE` (from brand.json) to tone all four drafts. The shape below is structural — what fields each platform wants — not voice. Match `$BRAND_VOICE` for tone.
 
@@ -113,7 +115,7 @@ Use `$BRAND_VOICE` (from brand.json) to tone all four drafts. The shape below is
 - IG-friendly hashtags (8 is fine) — content-specific + brand-tagged
 
 **X (single tweet OR 3-tweet reply chain)**:
-- T1 (hook, ≤280 chars, 1 image): "Shipped … today — <feature one-liner>"
+- T1 (hook, ≤280 chars, 1 image): "Shipped … today: <feature one-liner>"
 - T2 (detail, ≤280 chars, 1 image): the user-facing experience
 - T3 (closing, ≤280 chars, no media): the reflection + hashtags
 - Or a single tweet if the feature is simple (e.g. one screen recording tells the whole story)
@@ -129,7 +131,7 @@ Examples of the announcement → Pinterest rewrite:
 | Announcement (LinkedIn / X / IG) | Pinterest search-rewrite |
 |---|---|
 | "Just shipped: AI Explain feature in <App>" | "How to chat with <content> using AI on iPhone" |
-| "New History view: 9 eras of <topic>" | "<Topic> Timeline — Free iPhone App" |
+| "New History view: 9 eras of <topic>" | "<Topic> Timeline: Free iPhone App" |
 | "Redesigned More tab" | "Best <App-category> Features for iPhone" |
 
 Write `/tmp/pinterest-${SLUG_FILE}.json`:
