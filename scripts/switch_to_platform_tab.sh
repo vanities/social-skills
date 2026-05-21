@@ -58,17 +58,28 @@ verify_host() {
   echo "$url" | grep -q "$HOST"
 }
 
-# Force agent-browser's current-page pointer onto the matched tab via its index
-# (one activation), then verify. Returns 0 only on a verified switch.
+# Force agent-browser's current-page pointer onto the matched tab, then verify.
+# The tab-switch arg differs by agent-browser version:
+#   * <=0.25 : `tab <index>`  — bare positional index
+#   * >=0.26 : `tab t<N>`     — stable per-session id (1-based); bare int rejected
+# We can't read the daemon's t<N> for a given URL without `tab list`, which is
+# banned (its CDP attach can silently respawn Chrome — see AGENTS.md). So we try
+# the plausible refs in order and let verify_host() guard each: landing on a
+# non-HOST tab just fails that attempt, never a false success. Bounded (3 tries),
+# never a 0..N sweep. find_index is 0-based, so the >=0.26 id is index+1.
 force_via_index() {
-  local idx
+  local idx ref
   idx=$(find_index)
   [ -z "$idx" ] && return 1
-  agent-browser tab "$idx" >/dev/null 2>&1
-  sleep 1
-  CUR_URL=$(verify_host) || return 1
-  echo "switch_to_platform_tab: switched via index $idx ($CUR_URL)" >&2
-  return 0
+  for ref in "t$((idx + 1))" "$idx" "t$idx"; do
+    agent-browser tab "$ref" >/dev/null 2>&1
+    sleep 1
+    if CUR_URL=$(verify_host); then
+      echo "switch_to_platform_tab: switched via tab ref '$ref' ($CUR_URL)" >&2
+      return 0
+    fi
+  done
+  return 1
 }
 
 # --- A matching tab already exists: activate it by id, never spawn/sweep -----
