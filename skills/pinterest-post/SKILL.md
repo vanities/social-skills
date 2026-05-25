@@ -2,7 +2,7 @@
 name: pinterest-post
 description: Post a pin to Pinterest. Reads a JSON spec with media, title, description, board, and optional destination link. Use when the user says "post to pinterest", "pin this", or runs /pinterest-post.
 argument-hint: [pin-json]
-allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash(jq *) Bash(cat *) Bash(mkdir *) Read(*) Write(*)
+allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash(jq *) Bash(cat *) Bash(mkdir *) Bash(head *) Bash(curl *) Read(*) Write(*)
 ---
 
 # Post a pin to Pinterest
@@ -27,6 +27,43 @@ allowed-tools: Bash(agent-browser *) Bash(test *) Bash(date *) Bash(grep *) Bash
 - `board` is required. Pinterest blocks publish until a board is selected.
 - `link` is optional but highly recommended — Pinterest's primary value is driving traffic.
 
+## THE most important thing to know (Business Hub UI, 2026-05)
+
+Pinterest serves the **Business Hub** UI. The single biggest failure mode is the
+**broken-render state**: a Pinterest tab that has been alive a while (or was
+navigated route-to-route) rots into a blank page — `document.body` still has a
+nonzero height but `innerText.length === 0`, `agent-browser snapshot -i` returns
+**0 refs**, and the form selectors don't exist. **This state survives hard
+reloads.** Both 2026-05-25 Pinterest runs wasted most of their effort here: they
+saw "snapshot returns nothing" and concluded the whole UI was eval-only, when in
+fact they were just operating inside a dead tab.
+
+**The fix is not eval-gymnastics — it is to open the builder in a FRESH tab and
+verify it rendered.** On a freshly-opened `pin-creation-tool` tab the builder
+renders normally: `#storyboard-upload-input` is present, `bodyLen > 0`, and
+`snapshot -i` returns ~70 refs (verified live 2026-05-25). So:
+
+- **Always open the builder in a NEW tab** (`agent-browser tab new …`), never by
+  re-navigating a long-lived Pinterest tab. A fresh tab inherits the logged-in
+  session cookie and renders clean.
+- **After every load, verify render** with the health check below. If blank,
+  open another fresh tab. Do not try to "wake up" a blank tab with clicks/reloads.
+- The new builder tab is a *spawned* tab; Step 10a's `close_spawned_tabs.sh`
+  cleans it up automatically at the end (it is not in `essential_tabs`).
+
+Genuinely-changed Business Hub selectors (verified from the 2026-05-25 run logs +
+live recon), used below instead of snapshot @refs because ids/test-ids survive
+re-renders better than refs do:
+
+| Field | Selector |
+|---|---|
+| File input | `#storyboard-upload-input` |
+| Title | `#storyboard-selector-title` |
+| Description | Draft.js editor `[aria-label="Describe your Pin"]` (needs `execCommand`, see Step 6) |
+| Link | `#WebsiteField` |
+| Board open-button | `[data-test-id=board-dropdown-select-button]` |
+| Publish | the enabled `button` whose text is `Publish` (eval-click, see Step 9) |
+
 ## Step 0a: Snapshot tabs (for cleanup at end)
 
 ```bash
@@ -47,155 +84,189 @@ echo "title=$(jq -r '.title' "$1" | wc -c) chars; description=$(jq -r '.descript
 
 Abort if any check fails. (`wc -c` includes trailing newline → effective max is 101 / 501.)
 
-## Step 2: Find or open the Pinterest tab
+## Step 2: Confirm Pinterest is logged in
+
+Make sure the persistent browser has a live Pinterest session before opening a
+builder. Use the curl-based helper (NEVER `agent-browser tab list` — auto-spawn
+risk; see feedback_no_agent_browser_in_cron_guard.md):
 
 ```bash
-# Switch to the Pinterest tab via curl-based discovery (NEVER `agent-browser
-# tab list` — auto-spawn risk). Helper does find + switch + URL-verify +
-# tab-new fallback in one step. See feedback_no_agent_browser_in_cron_guard.md.
 bash scripts/switch_to_platform_tab.sh "pinterest.com" "https://www.pinterest.com/"
 agent-browser wait --load networkidle
 ```
 
-If `agent-browser get url` returns a login URL, abort and tell the user to run `/pinterest-login`.
+If `agent-browser get url` returns a login URL, abort and tell the user to run
+`/pinterest-login`. (We don't post from this tab — Step 3 opens a fresh builder
+tab — but it confirms the session and lets `switch_to_platform_tab` repair a
+totally-missing Pinterest tab.)
 
-## Step 3: Open the pin builder
-
-Snapshot, find the **"Create"** sidebar button. Click. A dropdown opens with `Create Pin`, `Create Board`, `Create collage`. Click **"Create Pin"**.
+## Step 3: Open the pin builder in a FRESH tab + verify render
 
 ```bash
-# After the click, the URL becomes pinterest.com/pin-creation-tool/
-agent-browser wait --load networkidle
+open_builder() {
+  agent-browser tab new "https://www.pinterest.com/pin-creation-tool/" >/dev/null 2>&1
+  agent-browser wait --load networkidle
+  agent-browser wait $(bash scripts/jitter.sh 2500 4000)
+}
+
+builder_health() {
+  # Returns the JSON {ready, bodyLen, login}. ready=true means the file input
+  # exists AND the body actually rendered text.
+  agent-browser eval "(()=>{const up=!!document.querySelector('#storyboard-upload-input');const len=(document.body.innerText||'').length;const login=/\/login|\/signup/.test(location.pathname);return JSON.stringify({ready:up&&len>0,bodyLen:len,login})})()" 2>&1 | tail -1
+}
+
+READY=false
+for attempt in 1 2 3; do
+  open_builder
+  H=$(builder_health)
+  echo "[pinterest-post] builder attempt $attempt: $H"
+  echo "$H" | grep -q '"login":true' && { echo "[pinterest-post] hit a login wall — run /pinterest-login" >&2; exit 1; }
+  if echo "$H" | grep -q '"ready":true'; then READY=true; break; fi
+  # Blank/broken-render tab. Do NOT reload it (the rot survives reloads). Just
+  # loop — open_builder spawns a brand-new tab next iteration, which renders clean.
+  echo "[pinterest-post] builder tab blank (broken-render) — opening another fresh tab"
+done
+[ "$READY" = true ] || { echo "[pinterest-post] pin builder never rendered after 3 fresh tabs — abort" >&2; exit 1; }
 ```
 
-The pin builder shows:
-- A `File Upload` button — the underlying `<input type=file>` has `id="storyboard-upload-input"`, `accept` of common image/video MIME types, `multiple=true` (single image per pin is the typical case)
-- A `Title` textbox (disabled until media uploaded)
-- An `Add a detailed description` button (clicking opens a description editor)
-- A `Link` textbox (under a `Link` label)
-- A `Choose a board` dropdown (required for publish)
-- Tagged topics, products, more options
-- A `Create new Pin` button (top-right, disabled until form is valid)
+On a healthy builder, `snapshot -i` works again if you want refs — but the
+selectors in the table above are more stable, so the steps below use them.
 
 ## Step 4: Upload the media
 
 ```bash
 MEDIA=$(jq -r '.media' "$1")
 agent-browser upload "#storyboard-upload-input" "$MEDIA"
-agent-browser wait $(bash scripts/jitter.sh 1500 3500)
+agent-browser wait $(bash scripts/jitter.sh 2000 4000)
+# Confirm the title field enabled (it unlocks once media is attached).
+agent-browser eval "(()=>{const t=document.querySelector('#storyboard-selector-title');return t?('title enabled='+!t.disabled):'no title field yet'})()"
 ```
 
-Wait for the preview to render. Title / description / board fields become enabled.
+If the title field never appears, the upload didn't take — re-check the media path and retry the upload once.
 
 ## Step 5: Fill the title
 
-Re-snapshot, find the `Title` textbox (now enabled).
+`#storyboard-selector-title` is a plain input — `fill` works (verified 2026-05-25).
 
 ```bash
 TITLE=$(jq -r '.title' "$1")
-agent-browser click @<TITLE_REF>
-agent-browser wait $(bash scripts/jitter.sh 300 700)
-agent-browser type @<TITLE_REF> "$TITLE"
+agent-browser fill "#storyboard-selector-title" "$TITLE"
 agent-browser wait $(bash scripts/jitter.sh 400 1000)
+agent-browser eval "(()=>{const t=document.querySelector('#storyboard-selector-title');return 'title len='+(t?t.value.length:'?')})()"
 ```
 
-## Step 6: Fill the description
+## Step 6: Fill the description (Draft.js — needs execCommand)
 
-The description field renders as a `button` element wrapping a `combobox` (`Add a detailed description`). **Click the combobox child, not the button wrapper** — the button click sometimes fails to focus the input properly. The combobox ref appears as a child of the button in the snapshot.
+The Business Hub description box is a **Draft.js** editor at
+`[aria-label="Describe your Pin"]`. It **ignores** `agent-browser type` / `fill`
+/ `inserttext` / paste events — only `document.execCommand('insertText', …)`
+commits text to it. Stage the text in a `window` global first so quoting/escaping
+is bulletproof (`jq` emits a JS-safe string literal):
 
 ```bash
-DESCRIPTION=$(jq -r '.description' "$1")
-agent-browser click @<DESCRIPTION_COMBOBOX>   # the child combobox, not the button parent
+DESC_JS=$(jq '.description' "$1")   # JSON string literal == valid JS string literal
+agent-browser eval "window.__pinDesc = $DESC_JS; 'staged'"
+
+# Some renders gate the editor behind an "Add a detailed description" control —
+# click it first if the editor isn't present yet.
+agent-browser eval "(()=>{const e=document.querySelector('[aria-label=\"Describe your Pin\"]');if(e)return 'editor present';const add=Array.from(document.querySelectorAll('button,[role=button]')).find(b=>/detailed description/i.test(b.textContent||''));if(add){add.click();return 'opened editor'}return 'no editor/control'})()"
 agent-browser wait $(bash scripts/jitter.sh 400 900)
-agent-browser type @<DESCRIPTION_COMBOBOX> "$DESCRIPTION"
+
+agent-browser eval "(()=>{const e=document.querySelector('[aria-label=\"Describe your Pin\"]');if(!e)return 'NO EDITOR';e.focus();document.execCommand('insertText',false,window.__pinDesc);return 'desc len='+(e.textContent||'').length})()"
 agent-browser wait $(bash scripts/jitter.sh 400 1000)
 ```
 
+If `desc len` comes back 0, re-focus and re-run the `execCommand` line once.
+
 ## Step 7: Fill the link (if present)
+
+`#WebsiteField` is a plain input — `fill` works.
 
 ```bash
 LINK=$(jq -r '.link // empty' "$1")
 if [ -n "$LINK" ]; then
-  agent-browser click @<LINK_TEXTBOX>
-  agent-browser wait $(bash scripts/jitter.sh 300 700)
-  agent-browser type @<LINK_TEXTBOX> "$LINK"
+  agent-browser fill "#WebsiteField" "$LINK"
   agent-browser wait $(bash scripts/jitter.sh 400 1000)
 fi
 ```
 
 ## Step 8: Pick the board
 
-The `Choose a board` button opens a dropdown. Click, then either:
-- Click the existing board by name, or
-- Click "Create board", type the board name, click Create
+Open the dropdown via its test-id, then click the matching board by name. Stage
+the board name in a `window` global (same escaping trick as the description).
 
-**Critical**: re-snapshot RIGHT before clicking the board button — refs shift after every field fill (title / description / link), and the board-button ref captured pre-fill silently no-ops or, worse, triggers Pinterest's **drafts sidebar** which then hijacks the form with another saved draft. Confirmed live 2026-05-15: clicked a stale board ref, drafts sidebar opened, an unrelated "Acts 1:9" draft was auto-loaded into the form on top of the just-typed Lamentations content. Recovery is expensive (reload pin-creation-tool, re-upload, re-fill).
+**Critical**: Pinterest auto-saves the form to *drafts* on every change. Clicking
+a stale control — or clicking mid-auto-save — can open the **drafts sidebar**
+instead of the board dropdown, which then hijacks the form with an unrelated saved
+draft (confirmed 2026-05-15). Pause so auto-save settles, then sanity-check that
+the dropdown (not the drafts sidebar) opened.
 
 ```bash
 BOARD=$(jq -r '.board' "$1")
-# Pause briefly so Pinterest's auto-save commits before we change focus —
-# clicking during an in-flight auto-save is one of the ways the drafts
-# sidebar opens instead of the board dropdown.
-agent-browser wait $(bash scripts/jitter.sh 800 1500)
-# Re-snapshot to get the LIVE board-button ref (NOT the one captured post-upload)
-BOARD_BTN_REF=""
-for try in 1 2 3; do
-  BOARD_BTN_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'Open dropdown' | grep -iE 'board|choose' | head -1 | grep -oE 'ref=e[0-9]+' | sed 's/ref=/@/')
-  [ -n "$BOARD_BTN_REF" ] && break
-  agent-browser wait 800
-done
-[ -n "$BOARD_BTN_REF" ] || { echo "[pinterest-post] board button ref not found after 3 snapshots" >&2; exit 1; }
-agent-browser click "$BOARD_BTN_REF"
+BOARD_JS=$(jq '.board' "$1")
+agent-browser eval "window.__pinBoard = $BOARD_JS; 'staged'"
+agent-browser wait $(bash scripts/jitter.sh 800 1500)   # let auto-save commit before changing focus
+
+# Open the board dropdown
+agent-browser eval "(()=>{const b=document.querySelector('[data-test-id=board-dropdown-select-button]');if(!b)return 'NO BOARD BUTTON';b.click();return 'opened'})()"
 agent-browser wait $(bash scripts/jitter.sh 700 1300)
 
-# Sanity check: did the board dropdown open, or did the drafts sidebar
-# hijack? The dropdown shows a 'Create board' button; the drafts sidebar
-# shows a 'Pin drafts (N)' heading at the top of the left panel.
+# Did the dropdown open, or did the drafts sidebar hijack?
 DROPDOWN_STATE=$(agent-browser eval "(()=>{const draft=Array.from(document.querySelectorAll('h2')).find(h=>(h.textContent||'').startsWith('Pin drafts'));const create=Array.from(document.querySelectorAll('button')).find(b=>(b.textContent||'').trim()==='Create board');return JSON.stringify({draftsSidebar:!!draft,boardDropdown:!!create})})()" 2>&1 | tail -1)
 if echo "$DROPDOWN_STATE" | grep -q '"draftsSidebar":true'; then
-  echo "[pinterest-post] click opened drafts sidebar (hijack!) — aborting, re-run /pinterest-post to retry" >&2
+  echo "[pinterest-post] click opened drafts sidebar (hijack!) — abort, re-run to retry" >&2
   exit 1
 fi
+
+# Click the board whose visible text matches the name exactly.
+SEL=$(agent-browser eval "(()=>{const name=window.__pinBoard;const els=Array.from(document.querySelectorAll('[data-test-id*=board] [role=button],[role=button],[role=option],div'));const hit=els.find(e=>(e.textContent||'').trim()===name);if(hit){hit.click();return 'selected'}return 'not found'})()" 2>&1 | tail -1)
+echo "[pinterest-post] board select: $SEL"
+agent-browser wait $(bash scripts/jitter.sh 800 1500)
 ```
 
-**If no matching board exists** (fresh accounts have none — only "Create board" is offered), open the create-board form and type the name. **Pinterest assigns the board-name input a real DOM id of `boardEditName`** — type via the id selector, not the snapshot @ref (the @ref click sometimes fails to focus the input properly):
+**If the board doesn't exist** (`board select: not found`), create it inline. The
+create-board name input historically has DOM id `#boardEditName`:
 
 ```bash
-agent-browser click @<CREATE_BOARD>
+agent-browser eval "(()=>{const c=Array.from(document.querySelectorAll('button,[role=button]')).find(b=>(b.textContent||'').trim()==='Create board');if(c){c.click();return 'create form'}return 'no create btn'})()"
 agent-browser wait $(bash scripts/jitter.sh 600 1200)
 agent-browser eval "document.querySelector('#boardEditName')?.focus(); 'focused'"
-agent-browser type "#boardEditName" "$BOARD"
+agent-browser fill "#boardEditName" "$BOARD"
 agent-browser wait $(bash scripts/jitter.sh 600 1300)
-# Re-snapshot — Create button (was disabled) is now enabled
-agent-browser click "@<CREATE_BOARD_SUBMIT>"
+agent-browser eval "(()=>{const s=Array.from(document.querySelectorAll('button')).find(b=>(b.textContent||'').trim()==='Create'&&!b.disabled);if(s){s.click();return 'created'}return 'no submit'})()"
 agent-browser wait $(bash scripts/jitter.sh 1500 3000)
-# After board creates, dropdown closes; the board-button label changes to the new board name.
 ```
-
-**For an existing board** (subsequent posts), just click the matching button in the dropdown. After selection the dropdown closes and the button label reads `<Board Name> Open dropdown`.
 
 ## Step 9: Publish
 
-**The button labeled `Publish`** (top-right, red) is the publish action. Its ref shifts each render — re-snapshot. **Do NOT click `Create new Pin`** — that button starts a fresh draft and saves the current form as a *draft* (Pinterest auto-saves every form change to drafts; the sidebar shows `Pin drafts (N)`).
+The publish action is **the enabled `button` whose text is exactly `Publish`**
+(top-right, red). **Do NOT click `Create new Pin`** — that starts a fresh draft
+and saves the current form as a *draft* (the sidebar shows `Pin drafts (N)`).
 
-**Critical**: by the time you reach this step, the form has typically grown past one viewport and the Publish button (top-right of the form) is **scrolled off-screen** at a negative y. A click on a button at `y < 0` silently no-ops (or saves a draft) — you'll see "Pin drafts" increment instead of a published toast. Always scroll it into view before clicking.
-
-**Click via `eval`-find-button-by-text, NOT `@<PUBLISH_REF>`.** Confirmed live 2026-05-10: `agent-browser click "@<PUBLISH_REF>"` (with the button visibly in viewport, not disabled, scrollintoview-d) silently saved the form as a draft instead of publishing — `Pin drafts (N+1)` incremented, no toast. Re-clicking via `agent-browser eval "...pub.click()"` published immediately. Same pattern as X's tweetButton.
+**Click via `eval`, not `@<ref>`.** Confirmed across 2026-05-10 and 2026-05-25
+runs: `@ref` clicks on the publish button save a draft instead of publishing;
+`eval`-find-by-text + `.click()` publishes. Scroll it into view first via eval
+too (by publish time the form has usually grown past one viewport):
 
 ```bash
-agent-browser scrollintoview "@<PUBLISH_REF>"
-agent-browser wait $(bash scripts/jitter.sh 700 1300)
-# Sanity check the bbox is in viewport
-agent-browser eval "(()=>{const pub=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Publish'&&!b.disabled);if(!pub)return 'gone';const r=pub.getBoundingClientRect();return{disabled:pub.disabled,inViewport:r.y>=0&&r.y+r.height<=window.innerHeight}})()"
+# Scroll Publish into view
+agent-browser eval "(()=>{const p=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Publish'&&!b.disabled);if(!p)return 'no publish btn';p.scrollIntoView({block:'center'});return 'scrolled'})()"
+agent-browser wait $(bash scripts/jitter.sh 500 1100)
 
-# Publish via eval — the @ref path saves drafts even when bbox is correct.
-agent-browser eval "(()=>{const pub=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Publish'&&!b.disabled);if(pub){pub.click();return 'clicked'}return 'no btn'})()"
-agent-browser wait 8000   # publish takes 5–8s; the button text flips to "Publishing" mid-flight
+# Publish
+agent-browser eval "(()=>{const p=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Publish'&&!b.disabled);if(p){p.click();return 'clicked'}return 'no btn'})()"
+agent-browser wait 8000   # publish takes 5–8s; button text flips to "Publishing" mid-flight
 ```
 
-After click, look for **"Your Pin has been published!"** in the next snapshot. If instead you see `Pin drafts (N+1)` (incremented) and the form still shown, the click no-op'd — re-scroll, re-snapshot, re-click.
+**Verify it published, don't trust the click.** Look for the toast
+**"Your Pin has been published!"**. The reliable confirmation is the target
+board's pin count going up (and `Pin drafts (N)` decrementing). If you instead
+see `Pin drafts (N+1)`, the click saved a draft — re-scroll, re-run the eval
+click once.
 
-After publish: the form clears, `Pin drafts (N)` decrements by one, and the new pin appears at `https://www.pinterest.com/<handle>/<board>/`. Verify by navigating to the board and confirming the pin count went up.
+```bash
+agent-browser eval "(()=>{const ok=document.body.innerText.includes('Your Pin has been published');return ok?'PUBLISHED':'no toast yet'})()"
+```
 
 ## Step 10: Verification screenshot + run log
 
@@ -219,16 +290,15 @@ Use `Write` to create `~/.social-skills/logs/post/pinterest-default-<timestamp>.
   "description_chars": <n>,
   "board":      "...",
   "link":       "...",
-  "pin_url":    "https://www.pinterest.com/pin/...",
+  "pin_url":    "https://www.pinterest.com/<handle>/<board-slug>/",
+  "builder_attempts": <n>,
   "form_fields_used": {
-    "create_button":      "@<ref>",
-    "create_pin_link":    "@<ref>",
-    "file_input":         "#storyboard-upload-input",
-    "title_textbox":      "@<ref>",
-    "description_field":  "@<ref>",
-    "link_textbox":       "@<ref>",
-    "board_button":       "@<ref>",
-    "publish_button":     "@<ref>"
+    "file_input":        "#storyboard-upload-input",
+    "title_input":       "#storyboard-selector-title",
+    "description_field": "[aria-label='Describe your Pin'] via execCommand insertText",
+    "link_input":        "#WebsiteField",
+    "board_button":      "[data-test-id=board-dropdown-select-button]",
+    "publish_button":    "eval: button[text=Publish] .click()"
   },
   "verification_screenshot": "..."
 }
@@ -241,6 +311,13 @@ bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
 rm -f "$TAB_BASELINE"
 ```
 
+This also cleans up the fresh builder tab opened in Step 3 (it is not an
+`essential_tab`, so the closer removes it).
+
 ## Step 11: Report
 
-Outcome, pin URL, screenshot path, run log path. **Do not close the Pinterest platform tab** — the closer protects it via `essential_tabs`; only incidentally-spawned tabs get cleaned up.
+Outcome, pin URL (the board URL is the reliable one — Business Hub doesn't always
+expose a per-pin permalink immediately), screenshot path, run log path, and how
+many builder-tab attempts it took (a high count is the early warning that the
+broken-render rot is getting worse). **Do not close the Pinterest platform tab** —
+the closer protects it via `essential_tabs`.
