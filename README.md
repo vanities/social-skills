@@ -209,3 +209,7 @@ social-skills/
 - [ ] Facebook Page — easiest path is creating a Page + linking to IG via Meta Accounts Center to enable the cross-post toggle
 - [ ] Bluesky — similar to X minus the friction; ~1 hr to mirror the X skills
 - [ ] Auto-comment generation with user-approval pattern (currently fully skipped — too high-risk)
+
+## License
+
+[GNU General Public License v3.0](LICENSE)
