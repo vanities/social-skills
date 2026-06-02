@@ -50,11 +50,13 @@ If your daily content comes from somewhere else (RSS, a CMS, a static file, an L
 
 ## Step 2: Launch your iOS app and navigate to the content view
 
-Replace `com.example.yourapp` with your bundle identifier and update the tap targets for your app's UI. SwiftUI tab bars usually expose `Tab Bar` group with empty `children` — fall back to coordinate taps.
+Replace `com.example.yourapp` with your bundle identifier and `yourapp://...` with a deep-link your app registers (check your `Info.plist` `CFBundleURLSchemes`).
 
 ```bash
 xcrun simctl launch "$SIM_UDID" com.example.yourapp
-sleep 3   # SpringBoard handoff + first-frame render
+# Wait for your launch splash to fully clear before deep-linking — openurl
+# silently no-ops if it fires during the splash animation.
+sleep 8
 ```
 
 Probe + dismiss any onboarding / donation modal that might be in the way:
@@ -64,7 +66,23 @@ mcp__XcodeBuildMCP__session_set_defaults({simulatorId: "<value of $SIM_UDID prin
 mcp__XcodeBuildMCP__tap({label: "Not now"})   # safe to call; errors silently if absent
 ```
 
-Tap the destination view. Coordinates below assume iPhone 17 (402pt wide); adjust for your device. The screenshot grabs the full screen so framing matters here.
+**Navigate by URL-scheme deep-link, NOT by tapping the tab bar.** SwiftUI tab bars expose a `Tab Bar` group with empty `children`, so XcodeBuildMCP can't tap a tab by label, and a coordinate `tap({x, y})` needs **idb** — which a headless cron host (e.g. a Mac Mini) typically lacks, where tapping the tab bar can flail for many minutes. If your app registers a deep-link to the destination view, jump straight there — no idb, accessibility, or on-screen window required:
+
+```bash
+# PRIMARY: deep-link to the content view (define this route in your app).
+xcrun simctl openurl "$SIM_UDID" yourapp://content
+sleep 3   # view transition
+```
+
+Verify before screenshotting:
+
+```
+mcp__XcodeBuildMCP__snapshot_ui({})   # confirm the content view is showing, not the splash
+```
+
+If it's still on the splash, the app wasn't ready when the URL fired — `sleep 3` and re-issue the `openurl` once.
+
+**Fallback (idb-capable hosts only, e.g. an interactive Mac):** tap the destination tab by coordinate (iPhone 17 ≈ 402pt wide; adjust for your device), then `sleep 2`:
 
 ```
 mcp__XcodeBuildMCP__tap({x: 170, y: 825})

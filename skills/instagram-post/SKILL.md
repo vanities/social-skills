@@ -88,15 +88,49 @@ If the page is on a login wall, abort and tell the user to run `/instagram-login
 agent-browser snapshot -i 2>&1 | head -40
 ```
 
-## Step 4: Click "Create" (new post)
+## Step 4: Click "Create" → "Post" (open the upload dialog)
 
-From the snapshot, find the **"Create"** / **"New post"** link (usually labeled `New post Create` in the left sidebar). Click its `@ref`. After the click:
+The IG sidebar **"Create"** control (labeled `New post Create`) opens a small **submenu** (`Post` / `Reel` / …); clicking `Post` is what opens the upload dialog. This is the single flakiest step in the flow, for the same reason as the "Select crop" button in Step 6a: **IG's React ignores JS `.click()` here**, so `agent-browser click @ref` opens the submenu only sometimes. On the 2026-06-02 cron run this no-op burned ~5 minutes of SVG-hunting and reloads. Do NOT try the `instagram.com/create/style/` URL — IG bounces it back to the home feed.
+
+Find the Create ref and click it:
 
 ```bash
+CREATE_REF=$(agent-browser snapshot -i 2>&1 | grep -E 'New post|"Create"' | grep -oE 'ref=e[0-9]+' | head -1 | sed 's/ref=/@/')
+[ -z "$CREATE_REF" ] && { echo "[ig-post] Create button not in sidebar — aborting" >&2; exit 1; }
+agent-browser click "$CREATE_REF"
 agent-browser wait $(bash scripts/jitter.sh 700 1500)
 ```
 
-Then re-snapshot.
+Did the click land? Check for the `Post` submenu item OR the file input. If neither, the click no-op'd — retry as a **real mouse event** at the Create icon's center (the Step 6a "Select crop" technique):
+
+```bash
+STATE=$(agent-browser eval "(()=>{const post=Array.from(document.querySelectorAll('a,div[role=button],[role=link],span')).find(e=>e.textContent.trim()==='Post'&&e.offsetParent!==null);return JSON.stringify({hasPost:!!post,hasFile:!!document.querySelector('input[type=file]')})})()" 2>&1 | tail -1)
+echo "after Create click: $STATE"
+if ! echo "$STATE" | grep -qE '"has(Post|File)":true'; then
+  echo "[ig-post] Create click no-op'd — real-mouse retry" >&2
+  read -r CX CY < <(agent-browser eval "(()=>{const svg=document.querySelector('svg[aria-label=\"New post\"],svg[aria-label=\"Create\"]');const c=svg&&svg.closest('a,div[role=button],[role=link]');if(!c)return '0 0';const r=c.getBoundingClientRect();return Math.round(r.x+r.width/2)+' '+Math.round(r.y+r.height/2)})()" 2>&1 | tail -1 | tr -d '"')
+  if [ "${CX:-0}" != "0" ]; then
+    agent-browser mouse move "$CX" "$CY" && agent-browser wait 200 && agent-browser mouse down && agent-browser wait 100 && agent-browser mouse up
+    agent-browser wait $(bash scripts/jitter.sh 700 1500)
+  fi
+fi
+```
+
+Click the `Post` submenu item if present (no-op if Create opened the dialog directly):
+
+```bash
+agent-browser eval "(()=>{const post=Array.from(document.querySelectorAll('a,div[role=button],[role=link],span')).find(e=>e.textContent.trim()==='Post'&&e.offsetParent!==null);if(post){post.click();return 'clicked Post'}return 'no submenu (dialog opened directly?)'})()"
+agent-browser wait $(bash scripts/jitter.sh 800 1600)
+```
+
+Confirm the upload dialog is open before Step 5 — if there's still no file input after the click + real-mouse retry, **abort instead of grinding** (the grind is exactly what we're eliminating):
+
+```bash
+HASFILE=$(agent-browser eval "(()=>document.querySelector('input[type=file]')?'yes':'no')()" 2>&1 | tail -1 | tr -d '"')
+[ "$HASFILE" != "yes" ] && { echo "[ig-post] no file input after Create→Post — aborting rather than grinding" >&2; exit 1; }
+```
+
+Then re-snapshot and proceed to Step 5.
 
 ## Step 5: Upload the media
 
