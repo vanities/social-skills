@@ -47,6 +47,48 @@ if [ ! -x "$CHROME_BIN" ]; then
   exit 1
 fi
 
+# --- Self-heal a wedged / orphaned Chrome ------------------------------------
+# Failure mode this guards against (hit 2026-06-08 on the Mac mini): a Chrome
+# left holding this profile's SingletonLock but with NO reachable DevTools
+# endpoint. It happens when a later launch attempt spawns a SECOND Chrome that
+# sees the lock and exits — Chrome deletes the shared DevToolsActivePort file on
+# its way out, even though the original instance is still running. Once in that
+# state every `agent-browser open` exits instantly ("Chrome exited early without
+# writing DevToolsActivePort") because the profile is locked, the cron wrappers
+# abort, and the orphan keeps spinning up a doomed Chrome on every scheduled
+# fire. We detect the wedge and reset it before launching.
+#
+# CONSERVATIVE BY DESIGN: reset ONLY when a Chrome is bound to THIS profile AND
+# its DevTools port is unreachable. A healthy, reachable Chrome (the normal
+# idempotent re-run, or an interactive session) is never touched. We remove only
+# transient lock + port files — login data in Default/ is never deleted.
+profile_chrome_running() {
+  pgrep -f "user-data-dir=$PROFILE" >/dev/null 2>&1
+}
+chrome_devtools_reachable() {
+  local port
+  port=$(head -1 "$PROFILE/DevToolsActivePort" 2>/dev/null || true)
+  [ -n "$port" ] || return 1
+  # Try twice — a healthy but momentarily busy Chrome can miss a single short
+  # probe (see warm_all_cron.sh's -m bump history). Only conclude "unreachable"
+  # if BOTH attempts fail, so we never reset a healthy instance.
+  local i
+  for i in 1 2; do
+    curl -sS -m 6 "http://127.0.0.1:${port}/json/list" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+if profile_chrome_running && ! chrome_devtools_reachable; then
+  echo "[self-heal] Chrome is bound to $PROFILE but its DevTools port is unreachable — resetting the wedged instance."
+  pkill -f 'agent-browser-darwin' 2>/dev/null || true
+  pkill -9 -f "user-data-dir=$PROFILE" 2>/dev/null || true
+  sleep 2
+  rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" \
+        "$PROFILE/SingletonSocket" "$PROFILE/DevToolsActivePort"
+  echo "[self-heal] cleared stale lock + DevTools port files (login data in Default/ untouched)."
+fi
+
 BRAND_JSON="$REPO_ROOT/config/brand.json"
 
 # --disable-blink-features=AutomationControlled removes the navigator.webdriver

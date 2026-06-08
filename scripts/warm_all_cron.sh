@@ -58,7 +58,9 @@ probe_tabs() {
 }
 TAB_JSON=$(probe_tabs)
 if [ -z "$TAB_JSON" ]; then
-  launch_browser_once "DevToolsActivePort, daemon, or HTTP /json/list was unavailable (profile=$PROFILE, port=${PORT:-?}, pid=${DAEMON_PID:-?})"
+  # `|| true`: under set -e a failed launch must NOT abort — fall through to the
+  # re-probe + graceful skip below so launchd records a clean exit, not status 1.
+  launch_browser_once "DevToolsActivePort, daemon, or HTTP /json/list was unavailable (profile=$PROFILE, port=${PORT:-?}, pid=${DAEMON_PID:-?})" || true
   TAB_JSON=$(probe_tabs)
 fi
 if [ -z "$TAB_JSON" ] || ! echo "$TAB_JSON" | grep -qE 'instagram\.com|x\.com|pinterest\.com|linkedin\.com'; then
