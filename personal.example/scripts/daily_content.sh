@@ -80,19 +80,15 @@ if ! xcrun simctl list devices 2>/dev/null | grep -q '(Booted)'; then
   sleep 6
 fi
 
-# Snapshot the current tab set so we can clean up anything the skill spawns.
-# Default `keep_tabs_open=false` in config/brand.json; close_spawned_tabs.sh
-# no-ops when the flag is true. Platform tabs (essential_tabs) and
-# browser-internal URLs are always skipped by the closer.
-TAB_BASELINE="${HOME}/.social-skills/state/tab-baseline-daily-$$.json"
-bash scripts/tab_baseline_save.sh "$TAB_BASELINE"
-
 # --dangerously-skip-permissions: cron can't prompt for tool approvals.
 # Replace /post-daily-content with whatever skill name you installed at
 # skills/<name>/SKILL.md.
 claude --print --dangerously-skip-permissions "/post-daily-content"
 
-bash scripts/close_spawned_tabs.sh "$TAB_BASELINE"
-rm -f "$TAB_BASELINE"
+# Reconcile open tabs back to exactly the essential set — close posting
+# leftovers (Pinterest pin-creation-tool, x.com/home, …) and reopen anything
+# missing, so the browser stays at one tab per site. `keep_tabs_open=true` in
+# config/brand.json makes it a no-op. See scripts/reconcile_tabs.sh.
+bash scripts/reconcile_tabs.sh || true
 
 echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) cron complete ==="
